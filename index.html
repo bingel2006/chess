@@ -110,6 +110,7 @@
             padding: 2px;
             border-radius: 8px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            position: relative;
         }
         .cell {
             width: 50px;
@@ -447,6 +448,51 @@
         }
         .fortress-option:hover {
             background: rgba(139, 69, 19, 0.5);
+        }
+        @keyframes explosion {
+            0% { 
+                opacity: 1; 
+                transform: scale(0) rotate(0deg); 
+            }
+            50% { 
+                opacity: 1; 
+                transform: scale(1.5) rotate(180deg); 
+            }
+            100% { 
+                opacity: 0; 
+                transform: scale(2) rotate(360deg); 
+            }
+        }
+        .explosion {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 50px;
+            height: 50px;
+            background: radial-gradient(circle, #ff4444, #ff8800, #ffff00);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 10;
+            animation: explosion 0.5s ease-out forwards;
+        }
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: #ff4444;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9;
+        }
+        @keyframes particle-fly {
+            0% { 
+                opacity: 1; 
+                transform: translate(0, 0) scale(1); 
+            }
+            100% { 
+                opacity: 0; 
+                transform: translate(var(--dx), var(--dy)) scale(0); 
+            }
         }
     </style>
 </head>
@@ -902,6 +948,65 @@
                 gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.5);
                 oscillator.start(this.audioContext.currentTime);
                 oscillator.stop(this.audioContext.currentTime + 0.5);
+            }
+
+            playAttackSound() {
+                if (this.audioContext === null) {
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                const oscillator = this.audioContext.createOscillator();
+                const gainNode = this.audioContext.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(this.audioContext.destination);
+                oscillator.frequency.setValueAtTime(200, this.audioContext.currentTime);
+                oscillator.frequency.linearRampToValueAtTime(400, this.audioContext.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.2, this.audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.2);
+                oscillator.start(this.audioContext.currentTime);
+                oscillator.stop(this.audioContext.currentTime + 0.2);
+            }
+
+            createExplosion(x, y) {
+                const cell = this.getCell(x, y);
+                if (!cell || !cell.element) return;
+                const explosion = document.createElement('div');
+                explosion.className = 'explosion';
+                cell.element.appendChild(explosion);
+                setTimeout(() => {
+                    if (explosion.parentNode) {
+                        explosion.parentNode.removeChild(explosion);
+                    }
+                }, 500);
+            }
+
+            createParticles(fromX, fromY, toX, toY) {
+                const fromCell = this.getCell(fromX, fromY);
+                const toCell = this.getCell(toX, toY);
+                if (!fromCell || !toCell || !fromCell.element || !toCell.element) return;
+
+                const dx = toX - fromX;
+                const dy = toY - fromY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const numParticles = 8;
+
+                for (let i = 0; i < numParticles; i++) {
+                    const particle = document.createElement('div');
+                    particle.className = 'particle';
+                    particle.style.left = '25px';
+                    particle.style.top = '25px';
+                    particle.style.setProperty('--dx', `${(dx * 50 + (Math.random() - 0.5) * 20)}px`);
+                    particle.style.setProperty('--dy', `${(dy * 50 + (Math.random() - 0.5) * 20)}px`);
+                    particle.style.animation = `particle-fly 0.4s ease-out forwards`;
+                    particle.style.animationDelay = `${Math.random() * 0.1}s`;
+
+                    fromCell.element.appendChild(particle);
+
+                    setTimeout(() => {
+                        if (particle.parentNode) {
+                            particle.parentNode.removeChild(particle);
+                        }
+                    }, 400);
+                }
             }
 
             getAliveCount(player) {
@@ -1420,6 +1525,10 @@
             }
 
             attackPiece(attacker, defender, defX, defY) {
+                this.playAttackSound();
+                this.createParticles(attacker.posX, attacker.posY, defX, defY);
+                this.createExplosion(defX, defY);
+
                 let atkDamage = attacker.tempATK || attacker.atk;
                 let defDamage = defender.tempATK || defender.atk;
                 
