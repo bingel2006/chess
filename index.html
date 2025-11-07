@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>双人对战象棋游戏</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Arial', sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            overflow: hidden;
+        }
+        #container { 
+            display: flex; 
+            height: 100vh;
+            flex-direction: column;
+            padding: 10px;
+        }
+        #top-bar {
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .player-info {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            min-width: 280px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .player1-color { background: #2196F3; }
+        .player2-color { background: #F44336; }
+        .current-turn {
+            box-shadow: 0 0 20px rgba(255,255,255,0.8);
+            transform: scale(1.05);
+        }
+        #board-info {
+            background: rgba(0,0,0,0.8);
+            padding: 12px 25px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 40px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .board-stat {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .stat-label {
+            color: #aaa;
+        }
+        .stat-value {
+            font-size: 20px;
+            color: #4CAF50;
+        }
+        .player1-stat { color: #2196F3; }
+        .player2-stat { color: #F44336; }
+        #main-content {
+            display: flex;
+            flex: 1;
+            gap: 10px;
+            overflow: hidden;
+        }
+        #sidebar {
+            width: 300px;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 10px;
+            overflow-y: auto;
+        }
+        #game-area {
+            flex: 1;
+            background: rgba(0,0,0,0.5);
+            border-radius: 10px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+        }
+        #board {
+            display: grid;
+            grid-template-columns: repeat(17, 50px);
+            grid-template-rows: repeat(11, 50px);
+            gap: 2px;
+            background: #333;
+            padding: 2px;
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+        .cell {
+            width: 50px;
+            height: 50px;
+            background: #2d5016;
+            border: 1px solid #1a3009;
+            cursor: pointer;
+            position: relative;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .cell:hover {
+            filter: brightness(1.2);
+        }
+        .cell.river {
+            background: #1e88e5;
+        }
+        .cell.selected {
+            box-shadow: 0 0 15px #ffeb3b inset;
+            border: 3px solid #ffeb3b;
+        }
+        .cell.group-selected {
+            box-shadow: 0 0 15px #ff9800 inset;
+            border: 3px solid #ff9800;
+        }
+        .cell.movable {
+            background: rgba(76, 175, 80, 0.3);
+            border: 2px solid #4caf50;
+        }
+        .cell.attackable {
+            background: rgba(244, 67, 54, 0.3);
+            border: 2px solid #f44336;
+        }
+        .piece {
+            width: 44px;
+            height: 44px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            border: 3px solid #000;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+            cursor: pointer;
+            pointer-events: auto;
+        }
+        .piece.player1 {
+            border-radius: 50%;
+        }
+        .piece.player2 {
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+        }
+        .piece-name {
+            font-size: 11px;
+            margin-bottom: 2px;
+        }
+        .piece-stats {
+            font-size: 8px;
+            line-height: 1.2;
+        }
+        .piece.king {
+            border: 4px solid gold;
+            box-shadow: 0 0 15px gold;
+        }
+        .obstacle {
+            position: absolute;
+            top: 3px;
+            right: 3px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            font-size: 9px;
+            font-weight: bold;
+            z-index: 5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .obstacle.heal { 
+            background: #4CAF50; 
+            color: white; 
+        }
+        .obstacle.damage { 
+            background: #F44336; 
+            color: white; 
+        }
+        .obstacle.hidden { 
+            background: #808080; 
+            color: transparent; 
+        }
+        .section {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+        }
+        .section h3 {
+            margin-bottom: 8px;
+            color: #4CAF50;
+            font-size: 14px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        button:hover { 
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+        button:disabled { 
+            background: #666; 
+            cursor: not-allowed;
+            transform: none;
+        }
+        .role-btn {
+            background: #2196F3;
+            margin: 3px 0;
+            padding: 8px;
+            font-size: 11px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .role-btn:hover {
+            background: #1976D2;
+        }
+        .role-price {
+            background: rgba(255,255,255,0.2);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+        }
+        .action-btn {
+            background: #FF9800;
+            margin: 3px 0;
+        }
+        .action-btn:hover {
+            background: #F57C00;
+        }
+        #piece-info {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.9);
+            padding: 20px;
+            max-height: 150px;
+            overflow-y: auto;
+            border-top: 3px solid #4CAF50;
+            transform: translateY(100%);
+            transition: transform 0.3s;
+        }
+        #piece-info.show {
+            transform: translateY(0);
+        }
+        .info-text {
+            font-size: 12px;
+            line-height: 1.8;
+        }
+        .phase-setup { display: block; }
+        .phase-game { display: none; }
+        .game-active .phase-setup { display: none; }
+        .game-active .phase-game { display: block; }
+        .role-info {
+            font-size: 10px;
+            padding: 8px;
+            margin: 5px 0;
+            background: rgba(255,255,255,0.15);
+            border-radius: 4px;
+            border-left: 3px solid;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .winner-banner {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.95);
+            padding: 40px 60px;
+            border-radius: 20px;
+            font-size: 32px;
+            font-weight: bold;
+            text-align: center;
+            box-shadow: 0 0 50px rgba(255,255,255,0.5);
+            z-index: 1000;
+            display: none;
+        }
+        .winner-banner.show {
+            display: block;
+            animation: bounce 0.5s;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.1); }
+        }
+        .selected-role {
+            padding: 6px;
+            margin: 3px 0;
+            background: rgba(255,255,255,0.2);
+            border-radius: 4px;
+            font-size: 11px;
+            display: flex;
+            justify-content: space-between;
+        }
+        #group-section {
+            display: none;
+        }
+        #group-section.show {
+            display: block;
+        }
+        .wealth-display {
+            font-size: 14px;
+            color: #FFD700;
+            margin: 8px 0;
+            padding: 5px;
+            background: rgba(255,215,0,0.1);
+            border-radius: 4px;
+            text-align: center;
+        }
+        .hp-selector {
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+            flex-wrap: wrap;
+        }
+        .hp-option {
+            flex: 1;
+            min-width: 45px;
+            padding: 4px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 9px;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .hp-option:hover {
+            background: rgba(255,255,255,0.2);
+            transform: scale(1.05);
+        }
+        .hp-option.selected {
+            background: #4CAF50;
+            border-color: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="top-bar">
+            <div class="player-info player1-color" id="player1-info">
+                玩家1 | 财富: <span id="p1-wealth">1000</span>💰<br>
+                <span class="turn-status">准备中</span>
+            </div>
+            <button onclick="game.resetGame()" style="width: 150px;">重新开始</button>
+            <div class="player-info player2-color" id="player2-info">
+                玩家2 | 财富: <span id="p2-wealth">1000</span>💰<br>
+                <span class="turn-status">准备中</span>
+            </div>
+        </div>
+
+        <div id="board-info">
+            <div class="board-stat">
+                <span class="stat-label">玩家1棋子:</span>
+                <span class="stat-value player1-stat" id="p1-pieces-top">0</span>
+            </div>
+            <div class="board-stat">
+                <span class="stat-label">玩家2棋子:</span>
+                <span class="stat-value player2-stat" id="p2-pieces-top">0</span>
+            </div>
+        </div>
+
+        <div id="main-content">
+            <div id="sidebar">
+                <div class="phase-setup">
+                    <div class="section">
+                        <h3>🎮 游戏准备</h3>
+                        <div style="font-size: 12px; margin: 10px 0;">
+                            当前: <span id="setup-player">玩家1</span> 选择角色
+                        </div>
+                        <div class="wealth-display">
+                            剩余财富: <span id="current-wealth">1000</span>💰
+                        </div>
+                        <button onclick="game.switchSetupPlayer()">切换玩家</button>
+                        <button id="obs-btn" onclick="game.regenerateObstacles()">随机生成障碍物</button>
+                    </div>
+
+                    <div class="section">
+                        <h3>👥 选择角色 (最多9个)</h3>
+                        
+                        <div class="role-info" style="border-color: #4CAF50;">
+                            <div>
+                                <b>士兵</b> 基础HP:80 ATK:15 速度:2
+                            </div>
+                            <div class="role-price">50💰</div>
+                        </div>
+                        <div class="hp-selector">
+                            <div class="hp-option" onclick="game.selectRole('soldier', 80, 50)">80HP<br>50💰</div>
+                            <div class="hp-option" onclick="game.selectRole('soldier', 100, 70)">100HP<br>70💰</div>
+                            <div class="hp-option" onclick="game.selectRole('soldier', 120, 90)">120HP<br>90💰</div>
+                        </div>
+                        
+                        <div class="role-info" style="border-color: #2196F3; margin-top: 10px;">
+                            <div>
+                                <b>谋士</b> 基础HP:60 ATK:25 速度:3
+                            </div>
+                            <div class="role-price">80💰</div>
+                        </div>
+                        <div class="hp-selector">
+                            <div class="hp-option" onclick="game.selectRole('strategist', 60, 80)">60HP<br>80💰</div>
+                            <div class="hp-option" onclick="game.selectRole('strategist', 80, 110)">80HP<br>110💰</div>
+                            <div class="hp-option" onclick="game.selectRole('strategist', 100, 140)">100HP<br>140💰</div>
+                        </div>
+                        
+                        <div class="role-info" style="border-color: #F44336; margin-top: 10px;">
+                            <div>
+                                <b>将军</b> 基础HP:100 ATK:20 速度:2
+                            </div>
+                            <div class="role-price">100💰</div>
+                        </div>
+                        <div class="hp-selector">
+                            <div class="hp-option" onclick="game.selectRole('general', 100, 100)">100HP<br>100💰</div>
+                            <div class="hp-option" onclick="game.selectRole('general', 130, 140)">130HP<br>140💰</div>
+                            <div class="hp-option" onclick="game.selectRole('general', 160, 180)">160HP<br>180💰</div>
+                        </div>
+                        
+                        <div class="role-info" style="border-color: #9C27B0; margin-top: 10px;">
+                            <div>
+                                <b>工人</b> 基础HP:70 ATK:10 速度:4
+                            </div>
+                            <div class="role-price">60💰</div>
+                        </div>
+                        <div class="hp-selector">
+                            <div class="hp-option" onclick="game.selectRole('worker', 70, 60)">70HP<br>60💰</div>
+                            <div class="hp-option" onclick="game.selectRole('worker', 90, 85)">90HP<br>85💰</div>
+                            <div class="hp-option" onclick="game.selectRole('worker', 110, 110)">110HP<br>110💰</div>
+                        </div>
+                        
+                        <div class="role-info" style="border-color: #FF9800; margin-top: 10px;">
+                            <div>
+                                <b>刺客</b> 基础HP:50 ATK:30 速度:3
+                            </div>
+                            <div class="role-price">90💰</div>
+                        </div>
+                        <div class="hp-selector">
+                            <div class="hp-option" onclick="game.selectRole('assassin', 50, 90)">50HP<br>90💰</div>
+                            <div class="hp-option" onclick="game.selectRole('assassin', 70, 125)">70HP<br>125💰</div>
+                            <div class="hp-option" onclick="game.selectRole('assassin', 90, 160)">90HP<br>160💰</div>
+                        </div>
+
+                        <div style="margin-top: 10px; font-size: 11px;">
+                            已选: <span id="selected-count">0</span>/9
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h3>已选择角色</h3>
+                        <div id="selected-roles"></div>
+                    </div>
+
+                    <div class="section">
+                        <h3>▶️ 开始游戏</h3>
+                        <button onclick="game.finishCurrentSetup()" id="finish-setup-btn">完成选择</button>
+                        <button onclick="game.startGame()" id="start-game-btn" disabled>开始对战</button>
+                    </div>
+
+                    <div class="section">
+                        <h3>ℹ️ 游戏说明</h3>
+                        <div style="font-size: 10px; line-height: 1.6;">
+                            <div>• 双方各有1000💰财富</div>
+                            <div>• 购买角色时可选择不同HP等级</div>
+                            <div>• HP越高价格越贵</div>
+                            <div>• 最多9个棋子+1个国王</div>
+                            <div>• 轮流移动，击败对方国王获胜</div>
+                            <div>• 支持拆分棋子和组队攻击</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="phase-game">
+                    <div class="section">
+                        <h3>📊 游戏状态</h3>
+                        <div style="font-size: 11px; line-height: 1.8;">
+                            <div>当前回合: <span id="current-player-text">玩家1</span></div>
+                            <div>玩家1棋子: <span id="p1-pieces-game">0</span></div>
+                            <div>玩家2棋子: <span id="p2-pieces-game">0</span></div>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h3>🎯 操作提示</h3>
+                        <div style="font-size: 11px; line-height: 1.6; margin-bottom: 10px;">
+                            <div id="game-hint">点击你的棋子选择，然后点击可达格子移动</div>
+                        </div>
+                        <div id="action-buttons" style="display: none;">
+                            <button class="action-btn" onclick="game.splitPiece()">拆分棋子</button>
+                            <button class="action-btn" onclick="game.toggleGroupSelect()">组队模式</button>
+                        </div>
+                        <button onclick="game.endTurn()">结束回合</button>
+                    </div>
+
+                    <div class="section" id="group-section">
+                        <h3>组队攻击</h3>
+                        <div style="font-size: 11px; margin-bottom: 8px;">点击相邻棋子组队，然后攻击敌方</div>
+                        <div id="group-info">组队: 0 棋子</div>
+                        <button class="action-btn" onclick="game.executeGroupAttack()">执行组队攻击</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="game-area">
+                <div id="board"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="piece-info">
+        <div class="info-text" id="piece-info-text">点击棋子查看详细信息</div>
+    </div>
+
+    <div id="winner-banner" class="winner-banner"></div>
+
+    <script>
+        class Game {
+            constructor() {
+                this.boardWidth = 17;
+                this.boardHeight = 11;
+                this.riverX = 8;
+                this.board = [];
+                this.currentPhase = 'setup';
+                this.setupPlayer = 1;
+                this.playerRoles = [[], []];
+                this.playerWealth = [1000, 1000];
+                this.currentPlayer = 1;
+                this.selectedPiece = null;
+                this.selectedGroup = [];
+                this.groupSelectMode = false;
+                this.gameStarted = false;
+                this.gameEnded = false;
+                this.hasMoved = false;
+                
+                this.roleTypes = {
+                    soldier: { name: '士兵', baseHP: 80, atk: 15, speed: 2, color: '#4CAF50', basePrice: 50 },
+                    strategist: { name: '谋士', baseHP: 60, atk: 25, speed: 3, color: '#2196F3', basePrice: 80 },
+                    general: { name: '将军', baseHP: 100, atk: 20, speed: 2, color: '#F44336', basePrice: 100 },
+                    worker: { name: '工人', baseHP: 70, atk: 10, speed: 4, color: '#9C27B0', basePrice: 60 },
+                    assassin: { name: '刺客', baseHP: 50, atk: 30, speed: 3, color: '#FF9800', basePrice: 90 },
+                    king: { name: '国王', hp: 150, atk: 0, speed: 2, color: '#FFD700' }
+                };
+
+                this.initBoard();
+                this.generateObstacles();
+                this.updateUI();
+            }
+
+            getAliveCount(player) {
+                return this.playerRoles[player - 1].filter(role => role.alive).length;
+            }
+
+            initBoard() {
+                const boardEl = document.getElementById('board');
+                boardEl.innerHTML = '';
+                this.board = [];
+                
+                for (let y = 0; y < this.boardHeight; y++) {
+                    for (let x = 0; x < this.boardWidth; x++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'cell';
+                        if (x === this.riverX) cell.classList.add('river');
+                        cell.dataset.x = x;
+                        cell.dataset.y = y;
+                        cell.onclick = (e) => {
+                            if (e.target === cell) {
+                                this.onCellClick(parseInt(cell.dataset.x), parseInt(cell.dataset.y));
+                            }
+                        };
+                        boardEl.appendChild(cell);
+                        
+                        this.board.push({
+                            x, y,
+                            element: cell,
+                            piece: null,
+                            obstacle: null
+                        });
+                    }
+                }
+            }
+
+            getCell(x, y) {
+                return this.board.find(c => c.x === x && c.y === y);
+            }
+
+            generateObstacles() {
+                this.board.forEach(cell => cell.obstacle = null);
+                const numObstacles = 25;
+                let placed = 0;
+                while (placed < numObstacles) {
+                    const idx = Math.floor(Math.random() * this.board.length);
+                    const cell = this.board[idx];
+                    if (cell.x !== this.riverX && !cell.obstacle) {
+                        const isGood = Math.random() > 0.5;
+                        cell.obstacle = {
+                            type: isGood ? 'heal' : 'damage',
+                            amount: 30,
+                            revealed: false
+                        };
+                        placed++;
+                    }
+                }
+            }
+
+            regenerateObstacles() {
+                if (this.setupPlayer !== 1) return;
+                this.generateObstacles();
+                this.renderBoard();
+            }
+
+            selectRole(type, hp, price) {
+                const currentRoles = this.playerRoles[this.setupPlayer - 1];
+                if (currentRoles.length >= 9) {
+                    alert('最多9个棋子！');
+                    return;
+                }
+                
+                if (this.playerWealth[this.setupPlayer - 1] < price) {
+                    alert('财富不足！');
+                    return;
+                }
+                
+                const baseRole = this.roleTypes[type];
+                const role = {
+                    ...baseRole,
+                    hp: hp,
+                    currentHP: hp,
+                    price: price,
+                    id: Date.now() + Math.random(),
+                    player: this.setupPlayer,
+                    alive: false
+                };
+                
+                this.playerWealth[this.setupPlayer - 1] -= price;
+                currentRoles.push(role);
+                this.updateSelectedCount();
+                this.updateWealthDisplay();
+            }
+
+            updateWealthDisplay() {
+                document.getElementById('current-wealth').textContent = this.playerWealth[this.setupPlayer - 1];
+                document.getElementById('p1-wealth').textContent = this.playerWealth[0];
+                document.getElementById('p2-wealth').textContent = this.playerWealth[1];
+            }
+
+            updateSelectedCount() {
+                const currentRoles = this.playerRoles[this.setupPlayer - 1];
+                const count = currentRoles.length;
+                document.getElementById('selected-count').textContent = count;
+                const sel = document.getElementById('selected-roles');
+                sel.innerHTML = '';
+                currentRoles.forEach((role, idx) => {
+                    const d = document.createElement('div');
+                    d.className = 'selected-role';
+                    d.style.color = role.color;
+                    d.innerHTML = `
+                        <span>${role.name} HP:${role.hp}</span>
+                        <span>${role.price}💰</span>
+                    `;
+                    sel.appendChild(d);
+                });
+                document.getElementById('finish-setup-btn').disabled = count === 0;
+            }
+
+            switchSetupPlayer() {
+                this.setupPlayer = 3 - this.setupPlayer;
+                document.getElementById('setup-player').textContent = `玩家${this.setupPlayer}`;
+                this.updateSelectedCount();
+                this.updateWealthDisplay();
+            }
+
+            finishCurrentSetup() {
+                const currentRoles = this.playerRoles[this.setupPlayer - 1];
+                if (currentRoles.length === 0) {
+                    alert('请至少选择1个角色！');
+                    return;
+                }
+                if (this.setupPlayer === 1) {
+                    this.switchSetupPlayer();
+                } else {
+                    document.getElementById('start-game-btn').disabled = false;
+                }
+            }
+
+            startGame() {
+                const king1 = { ...this.roleTypes.king, id: 'king1', currentHP: 150, player: 1, alive: false };
+                this.playerRoles[0].push(king1);
+                const king2 = { ...this.roleTypes.king, id: 'king2', currentHP: 150, player: 2, alive: false };
+                this.playerRoles[1].push(king2);
+
+                this.placePieces();
+                this.currentPhase = 'game';
+                this.gameStarted = true;
+                this.gameEnded = false;
+                this.hasMoved = false;
+                this.currentPlayer = 1;
+                document.body.classList.add('game-active');
+                this.renderBoard();
+                this.updateUI();
+            }
+
+            placePieces() {
+                for (let p = 1; p <= 2; p++) {
+                    const playerRoles = this.playerRoles[p - 1];
+                    const backX = p === 1 ? 0 : this.boardWidth - 1;
+                    const secondX = p === 1 ? 1 : this.boardWidth - 2;
+                    const centerY = 5;
+
+                    const king = playerRoles.find(r => r.name === '国王');
+                    if (king) {
+                        let posX = backX;
+                        let cell = this.getCell(posX, centerY);
+                        if (!cell || cell.obstacle) {
+                            posX = secondX;
+                            cell = this.getCell(posX, centerY);
+                        }
+                        king.posX = posX;
+                        king.posY = centerY;
+                        king.alive = true;
+                    }
+
+                    let otherPositions = [];
+                    for (let y = 0; y < this.boardHeight; y++) {
+                        if (y !== centerY || backX !== (king ? king.posX : -1)) {
+                            const cell = this.getCell(backX, y);
+                            if (cell && !cell.obstacle) {
+                                otherPositions.push({x: backX, y});
+                            }
+                        }
+                    }
+                    const numOthers = playerRoles.length - 1;
+                    while (otherPositions.length < numOthers) {
+                        for (let y = 0; y < this.boardHeight; y++) {
+                            const cell = this.getCell(secondX, y);
+                            if (cell && !cell.obstacle && !otherPositions.some(pos => pos.x === secondX && pos.y === y)) {
+                                otherPositions.push({x: secondX, y});
+                                break;
+                            }
+                        }
+                        break;
+                    }
+
+                    for (let i = otherPositions.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [otherPositions[i], otherPositions[j]] = [otherPositions[j], otherPositions[i]];
+                    }
+
+                    const otherRoles = playerRoles.filter(r => r !== king);
+                    otherRoles.forEach((role, idx) => {
+                        if (idx < otherPositions.length) {
+                            role.posX = otherPositions[idx].x;
+                            role.posY = otherPositions[idx].y;
+                            role.alive = true;
+                        }
+                    });
+                }
+            }
+
+            renderBoard() {
+                this.board.forEach(cellData => {
+                    const cell = cellData.element;
+                    cell.innerHTML = '';
+                    cellData.piece = null;
+                    cell.classList.remove('selected', 'group-selected', 'movable', 'attackable');
+                    
+                    if (cellData.obstacle) {
+                        const obsEl = document.createElement('div');
+                        const isRevealed = cellData.obstacle.revealed;
+                        obsEl.className = `obstacle ${isRevealed ? cellData.obstacle.type : 'hidden'}`;
+                        if (isRevealed) {
+                            obsEl.textContent = cellData.obstacle.type === 'heal' ? '+' : '-';
+                        }
+                        cell.appendChild(obsEl);
+                    }
+                });
+
+                this.playerRoles.flat().forEach(role => {
+                    if (!role.alive) return;
+                    const cellData = this.getCell(role.posX, role.posY);
+                    if (!cellData) return;
+                    cellData.piece = role;
+                    const cell = cellData.element;
+                    const pieceEl = document.createElement('div');
+                    pieceEl.className = `piece player${role.player} ${role.name === '国王' ? 'king' : ''}`;
+                    pieceEl.style.backgroundColor = role.color;
+                    pieceEl.onclick = (e) => {
+                        e.stopPropagation();
+                        this.onPieceClick(role);
+                    };
+                    const nameEl = document.createElement('div');
+                    nameEl.className = 'piece-name';
+                    nameEl.textContent = role.name.charAt(0);
+                    const statsEl = document.createElement('div');
+                    statsEl.className = 'piece-stats';
+                    statsEl.textContent = `${role.currentHP}/${role.hp}`;
+                    pieceEl.appendChild(nameEl);
+                    pieceEl.appendChild(statsEl);
+                    cell.appendChild(pieceEl);
+                });
+
+                if (this.selectedPiece) {
+                    const cell = this.getCell(this.selectedPiece.posX, this.selectedPiece.posY);
+                    if (cell) cell.element.classList.add('selected');
+                    this.highlightMovable();
+                }
+
+                this.selectedGroup.forEach(role => {
+                    const cell = this.getCell(role.posX, role.posY);
+                    if (cell) cell.element.classList.add('group-selected');
+                });
+            }
+
+            onPieceClick(role) {
+                if (this.currentPhase !== 'game' || this.gameEnded) return;
+                
+                if (this.groupSelectMode && role.player === this.currentPlayer) {
+                    if (this.selectedGroup.includes(role)) {
+                        this.selectedGroup = this.selectedGroup.filter(r => r !== role);
+                    } else if (this.isAdjacentToGroup(role)) {
+                        this.selectedGroup.push(role);
+                    }
+                    this.updateGroupUI();
+                    this.renderBoard();
+                } else if (role.player === this.currentPlayer && !this.groupSelectMode) {
+                    this.selectPiece(role);
+                }
+                this.showPieceInfo(role);
+            }
+
+            isAdjacentToGroup(role) {
+                if (this.selectedGroup.length === 0) return true;
+                return this.selectedGroup.some(g => this.getManhattanDistance(g.posX, g.posY, role.posX, role.posY) === 1);
+            }
+
+            getManhattanDistance(x1, y1, x2, y2) {
+                return Math.abs(x1 - x2) + Math.abs(y1 - y2);
+            }
+
+            updateGroupUI() {
+                document.getElementById('group-info').textContent = `组队: ${this.selectedGroup.length} 棋子`;
+                document.getElementById('group-section').classList.toggle('show', this.selectedGroup.length > 1);
+            }
+
+            toggleGroupSelect() {
+                this.groupSelectMode = !this.groupSelectMode;
+                this.selectedPiece = null;
+                this.selectedGroup = [];
+                this.updateGroupUI();
+                this.renderBoard();
+                document.getElementById('game-hint').textContent = this.groupSelectMode ? '点击相邻棋子组队' : '点击你的棋子选择';
+            }
+
+            executeGroupAttack() {
+                if (this.selectedGroup.length < 2) {
+                    alert('至少需要2个棋子组队！');
+                    return;
+                }
+                const targets = this.getAdjacentEnemies(this.selectedGroup);
+                if (targets.length === 0) {
+                    alert('周围没有敌方棋子！');
+                    return;
+                }
+                
+                const totalATK = this.selectedGroup.reduce((sum, r) => sum + r.atk, 0);
+                const target = targets[0];
+                
+                if (totalATK >= target.currentHP) {
+                    target.alive = false;
+                    this.selectedGroup.forEach(r => {
+                        r.currentHP = Math.max(1, r.currentHP - 10);
+                    });
+                    alert(`组队攻击成功！击败了${target.name}`);
+                } else {
+                    this.selectedGroup.forEach(r => r.alive = false);
+                    alert('组队攻击失败，所有攻击棋子阵亡！');
+                }
+                
+                this.selectedGroup = [];
+                this.groupSelectMode = false;
+                this.hasMoved = true;
+                this.updateGroupUI();
+                this.renderBoard();
+                this.checkWin();
+            }
+
+            getAdjacentEnemies(pieces) {
+                const enemies = [];
+                pieces.forEach(piece => {
+                    const adjacent = this.getAdjacentCells(piece.posX, piece.posY, 1);
+                    adjacent.forEach(cell => {
+                        if (cell.piece && cell.piece.player !== this.currentPlayer && 
+                            cell.piece.alive && !enemies.includes(cell.piece)) {
+                            enemies.push(cell.piece);
+                        }
+                    });
+                });
+                return enemies;
+            }
+
+            splitPiece() {
+                if (!this.selectedPiece || this.hasMoved) {
+                    alert('本回合已经移动过了！');
+                    return;
+                }
+                
+                const numSplit = Math.floor(Math.random() * 3) + 2;
+                const newHP = Math.floor(this.selectedPiece.currentHP / numSplit);
+                
+                if (newHP < 10) {
+                    alert('HP太低，无法拆分！');
+                    return;
+                }
+                
+                const adjCells = this.getAdjacentCells(this.selectedPiece.posX, this.selectedPiece.posY, 1)
+                    .filter(c => !c.piece);
+                
+                if (adjCells.length < numSplit - 1) {
+                    alert('周边空位不足，无法拆分！');
+                    return;
+                }
+                
+                this.selectedPiece.currentHP = newHP;
+                
+                const shuffled = adjCells.sort(() => 0.5 - Math.random());
+                const originalType = Object.keys(this.roleTypes).find(k => 
+                    this.roleTypes[k].name === this.selectedPiece.name && k !== 'king');
+                
+                for (let i = 0; i < numSplit - 1; i++) {
+                    const newRole = {
+                        ...this.roleTypes[originalType],
+                        hp: newHP,
+                        currentHP: newHP,
+                        id: Date.now() + Math.random() + i,
+                        player: this.selectedPiece.player,
+                        alive: true,
+                        posX: shuffled[i].x,
+                        posY: shuffled[i].y
+                    };
+                    this.playerRoles[this.selectedPiece.player - 1].push(newRole);
+                }
+                
+                this.selectedPiece = null;
+                this.hasMoved = true;
+                document.getElementById('action-buttons').style.display = 'none';
+                this.renderBoard();
+                this.updateUI();
+                alert(`成功拆分成${numSplit}个棋子！`);
+            }
+
+            getAdjacentCells(x, y, distance = 1) {
+                const cells = [];
+                for (let dy = -distance; dy <= distance; dy++) {
+                    for (let dx = -distance; dx <= distance; dx++) {
+                        if (dx === 0 && dy === 0) continue;
+                        if (Math.abs(dx) + Math.abs(dy) > distance) continue;
+                        const nx = x + dx;
+                        const ny = y + dy;
+                        if (nx >= 0 && nx < this.boardWidth && ny >= 0 && ny < this.boardHeight) {
+                            const cell = this.getCell(nx, ny);
+                            if (cell) cells.push(cell);
+                        }
+                    }
+                }
+                return cells;
+            }
+
+            showPieceInfo(role) {
+                const text = `名称: ${role.name}\nHP: ${role.currentHP}/${role.hp}\nATK: ${role.atk}\n速度: ${role.speed}\n玩家: 玩家${role.player}`;
+                document.getElementById('piece-info-text').textContent = text;
+                document.getElementById('piece-info').classList.add('show');
+            }
+
+            onCellClick(x, y) {
+                if (this.currentPhase !== 'game' || this.gameEnded) return;
+                const cellData = this.getCell(x, y);
+                if (!cellData) return;
+                
+                document.getElementById('piece-info').classList.remove('show');
+                
+                if (this.selectedPiece && !this.hasMoved && this.selectedPiece.player === this.currentPlayer) {
+                    const distance = this.getManhattanDistance(this.selectedPiece.posX, this.selectedPiece.posY, x, y);
+                    
+                    if (distance <= this.selectedPiece.speed) {
+                        if (!cellData.piece) {
+                            this.movePiece(this.selectedPiece, x, y);
+                            this.checkAdjacentEnemies(this.selectedPiece);
+                            this.hasMoved = true;
+                            this.selectedPiece = null;
+                            document.getElementById('action-buttons').style.display = 'none';
+                            this.renderBoard();
+                            this.checkWin();
+                        } else if (cellData.piece.player !== this.currentPlayer) {
+                            this.attackPiece(this.selectedPiece, cellData.piece, x, y);
+                            this.hasMoved = true;
+                            this.selectedPiece = null;
+                            document.getElementById('action-buttons').style.display = 'none';
+                            this.renderBoard();
+                            this.checkWin();
+                        }
+                    } else {
+                        this.selectedPiece = null;
+                        document.getElementById('action-buttons').style.display = 'none';
+                        this.renderBoard();
+                    }
+                }
+            }
+
+            checkAdjacentEnemies(piece) {
+                const adjacent = this.getAdjacentCells(piece.posX, piece.posY, 1);
+                adjacent.forEach(cell => {
+                    if (cell.piece && cell.piece.player !== piece.player && cell.piece.alive) {
+                        this.attackPiece(piece, cell.piece, cell.piece.posX, cell.piece.posY);
+                    }
+                });
+            }
+
+            attackPiece(attacker, defender, defX, defY) {
+                const atkDamage = attacker.atk;
+                const defDamage = defender.atk;
+                
+                defender.currentHP -= atkDamage;
+                attacker.currentHP -= defDamage;
+                
+                if (defender.currentHP <= 0) {
+                    defender.alive = false;
+                }
+                if (attacker.currentHP <= 0) {
+                    attacker.alive = false;
+                }
+            }
+
+            selectPiece(piece) {
+                if (piece.player !== this.currentPlayer) {
+                    alert('请选择你自己的棋子！');
+                    return;
+                }
+                
+                if (this.hasMoved) {
+                    alert('本回合已经移动过了！');
+                    return;
+                }
+                
+                this.selectedPiece = piece;
+                this.selectedGroup = [piece];
+                this.renderBoard();
+                this.showPieceInfo(piece);
+                document.getElementById('action-buttons').style.display = 'block';
+                document.getElementById('game-hint').textContent = '点击可达格子移动/攻击';
+                this.updateGroupUI();
+            }
+
+            highlightMovable() {
+                if (!this.selectedPiece) return;
+                const sx = this.selectedPiece.posX;
+                const sy = this.selectedPiece.posY;
+                const speed = this.selectedPiece.speed;
+                
+                for (let y = 0; y < this.boardHeight; y++) {
+                    for (let x = 0; x < this.boardWidth; x++) {
+                        const distance = this.getManhattanDistance(sx, sy, x, y);
+                        if (distance > 0 && distance <= speed) {
+                            const cellData = this.getCell(x, y);
+                            if (cellData) {
+                                if (!cellData.piece) {
+                                    cellData.element.classList.add('movable');
+                                } else if (cellData.piece.player !== this.currentPlayer && cellData.piece.alive) {
+                                    cellData.element.classList.add('attackable');
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            movePiece(piece, tx, ty) {
+                const fromCell = this.getCell(piece.posX, piece.posY);
+                if (fromCell) fromCell.piece = null;
+                
+                piece.posX = tx;
+                piece.posY = ty;
+                
+                const toCell = this.getCell(tx, ty);
+                if (toCell) {
+                    toCell.piece = piece;
+                    
+                    if (toCell.obstacle && !toCell.obstacle.revealed) {
+                        toCell.obstacle.revealed = true;
+                        if (toCell.obstacle.type === 'heal') {
+                            piece.currentHP = Math.min(piece.hp, piece.currentHP + toCell.obstacle.amount);
+                            alert(`获得治疗 +${toCell.obstacle.amount} HP！`);
+                        } else {
+                            piece.currentHP = Math.max(1, piece.currentHP - toCell.obstacle.amount);
+                            alert(`受到伤害 -${toCell.obstacle.amount} HP！`);
+                        }
+                    }
+                }
+            }
+
+            checkWin() {
+                for (let p = 1; p <= 2; p++) {
+                    const roles = this.playerRoles[p - 1];
+                    const king = roles.find(r => r.name === '国王');
+                    if (king && !king.alive) {
+                        const winner = p === 1 ? 2 : 1;
+                        document.getElementById('winner-banner').textContent = `玩家${winner} 获胜！`;
+                        document.getElementById('winner-banner').classList.add('show');
+                        this.gameEnded = true;
+                        return;
+                    }
+                }
+            }
+
+            endTurn() {
+                if (!this.hasMoved && this.selectedPiece) {
+                    const confirm = window.confirm('还没有移动棋子，确定要结束回合吗？');
+                    if (!confirm) return;
+                }
+                
+                this.currentPlayer = 3 - this.currentPlayer;
+                this.selectedPiece = null;
+                this.selectedGroup = [];
+                this.groupSelectMode = false;
+                this.hasMoved = false;
+                document.getElementById('action-buttons').style.display = 'none';
+                this.updateGroupUI();
+                this.renderBoard();
+                this.updateUI();
+            }
+
+            updateUI() {
+                const p1Count = this.getAliveCount(1);
+                const p2Count = this.getAliveCount(2);
+                
+                document.getElementById('p1-pieces-top').textContent = p1Count;
+                document.getElementById('p2-pieces-top').textContent = p2Count;
+                
+                if (this.currentPhase === 'setup') {
+                    document.querySelectorAll('.turn-status').forEach(el => el.textContent = '准备中');
+                    document.getElementById('player1-info').classList.remove('current-turn');
+                    document.getElementById('player2-info').classList.remove('current-turn');
+                } else {
+                    document.querySelectorAll('.turn-status').forEach((el, idx) => {
+                        const playerNum = idx === 0 ? 1 : 2;
+                        el.textContent = playerNum === this.currentPlayer ? '✓ 当前回合' : '等待中';
+                    });
+                    const currentEl = document.getElementById(`player${this.currentPlayer}-info`);
+                    if (currentEl) currentEl.classList.add('current-turn');
+                    const otherEl = document.getElementById(`player${3 - this.currentPlayer}-info`);
+                    if (otherEl) otherEl.classList.remove('current-turn');
+                    document.getElementById('current-player-text').textContent = `玩家${this.currentPlayer}`;
+                    document.getElementById('p1-pieces-game').textContent = p1Count;
+                    document.getElementById('p2-pieces-game').textContent = p2Count;
+                    document.getElementById('game-hint').textContent = this.selectedPiece ? 
+                        '点击可达格子移动/攻击' : '点击你的棋子选择';
+                }
+            }
+
+            resetGame() {
+                this.playerRoles = [[], []];
+                this.playerWealth = [1000, 1000];
+                this.selectedPiece = null;
+                this.selectedGroup = [];
+                this.groupSelectMode = false;
+                this.currentPlayer = 1;
+                this.setupPlayer = 1;
+                this.gameStarted = false;
+                this.gameEnded = false;
+                this.hasMoved = false;
+                this.currentPhase = 'setup';
+                document.body.classList.remove('game-active');
+                document.getElementById('start-game-btn').disabled = true;
+                document.getElementById('action-buttons').style.display = 'none';
+                this.initBoard();
+                this.generateObstacles();
+                this.renderBoard();
+                document.getElementById('piece-info').classList.remove('show');
+                document.getElementById('winner-banner').classList.remove('show');
+                this.updateSelectedCount();
+                this.updateWealthDisplay();
+                this.updateUI();
+            }
+        }
+
+        const game = new Game();
+    </script>
+</body>
+</html>
