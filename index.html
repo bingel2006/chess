@@ -142,6 +142,10 @@
             background: rgba(244, 67, 54, 0.3);
             border: 2px solid #f44336;
         }
+        .cell.placeable {
+            background: rgba(255, 193, 7, 0.3);
+            border: 2px solid #FF9800;
+        }
         .piece {
             width: 44px;
             height: 44px;
@@ -162,6 +166,10 @@
         }
         .piece.player2 {
             clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+        }
+        .piece.fortress {
+            border: 3px solid #8B4513;
+            box-shadow: 0 0 10px #8B4513;
         }
         .piece-name {
             font-size: 11px;
@@ -417,9 +425,29 @@
             cursor: pointer;
             float: right;
         }
+        .fortress-selector {
+            display: none;
+            margin-top: 10px;
+        }
+        .fortress-selector.show {
+            display: block;
+        }
+        .fortress-option {
+            background: rgba(139, 69, 19, 0.3);
+            border: 1px solid #8B4513;
+            margin: 2px 0;
+            padding: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 10px;
+            text-align: center;
+        }
+        .fortress-option:hover {
+            background: rgba(139, 69, 19, 0.5);
+        }
     </style>
 </head>
-<body>
+<body onclick="game.onBodyClick(event)">
     <div id="container">
         <div id="top-bar">
             <div class="player-info player1-color" id="player1-info">
@@ -574,6 +602,20 @@
                         <div id="event-target-hint" style="display: none;">点击棋盘上任意棋子应用事件</div>
                     </div>
 
+                    <div class="section" id="fortress-section">
+                        <h3>🏰 建造堡垒</h3>
+                        <div>使用财富在空格建造堡垒（2倍价格，不可移动，防御减半，可攻击相邻敌方）</div>
+                        <button class="action-btn" onclick="game.toggleFortressMode()">切换堡垒模式</button>
+                        <div class="fortress-selector" id="fortress-selector">
+                            <div class="fortress-option" onclick="game.selectFortressType('soldier', 80, 100)">士兵堡垒 80HP 100💰</div>
+                            <div class="fortress-option" onclick="game.selectFortressType('strategist', 60, 160)">谋士堡垒 60HP 160💰</div>
+                            <div class="fortress-option" onclick="game.selectFortressType('general', 100, 200)">将军堡垒 100HP 200💰</div>
+                            <div class="fortress-option" onclick="game.selectFortressType('worker', 70, 120)">工人堡垒 70HP 120💰</div>
+                            <div class="fortress-option" onclick="game.selectFortressType('assassin', 50, 180)">刺客堡垒 50HP 180💰</div>
+                        </div>
+                        <div id="fortress-hint" style="font-size: 10px; color: #FF9800; margin-top: 5px; display: none;">点击空置棋格放置选中的堡垒</div>
+                    </div>
+
                     <div class="section">
                         <h3>🎯 操作提示</h3>
                         <div style="font-size: 11px; line-height: 1.6; margin-bottom: 10px;">
@@ -633,6 +675,7 @@
     - 河格（第9列）：不可移动/占领。
   - **拆分棋子**：选棋子后点击按钮，随机拆分成2-4个子单位（HP 均分，需周边空位）。视为本回合行动。
   - **组队攻击**：切换组队模式，点击相邻你的棋子选组（橙色高亮，≥2个），点击相邻敌方执行。总 ATK vs 目标 HP：成功击败目标（攻击方 -10 HP），失败全死。
+  - **建造堡垒**：切换堡垒模式，选择类型（2倍原价），点击空置格子放置。堡垒不可移动（速度=0），可攻击相邻敌方；被攻击伤害减半。视为本回合行动。
 - **随机事件**：每玩家3次抽取（回合内用，视为行动）。抽取后若需目标，点击任意棋子应用。
   - 陨石攻击：-50 HP 给选棋子。
   - 发现石油：+200💰 财富。
@@ -649,6 +692,7 @@
 | 工人 | 70 | 10 | 4 | 紫色 | 60💰 | 高速侦察。 |
 | 刺客 | 50 | 30 | 3 | 橙色 | 90💰 | 脆皮秒杀。 |
 | 国王 | 150 | 30 | 2 | 金色 | 无 | 核心，反击强。 |
+| 堡垒 | 变 | 变 | 0 | 棕色边框 | 2倍 | 静态防御塔，可近攻。 |
 
 - HP 升级增加价格（e.g., 士兵 100HP=70💰）。
 - currentHP：当前生命，≤0 死亡移除。
@@ -660,7 +704,7 @@
 - **UI**：棋子显示 HP/总HP，点击查看详情（底部面板）。
 - **提示**：行动后高亮消失。无行动可结束回合。
 - **重置**：点击“重新开始”从头。
-- **技巧**：保护国王，用高 ATK 围攻敌王；事件/组队放大优势。
+- **技巧**：保护国王，用高 ATK 围攻敌王；事件/组队放大优势；堡垒建前线阻敌。
 
 享受游戏！如有问题，重启或检查浏览器控制台。
             </div>
@@ -682,6 +726,10 @@
                 this.selectedPiece = null;
                 this.selectedGroup = [];
                 this.groupSelectMode = false;
+                this.fortressPlaceMode = false;
+                this.selectedFortressType = null;
+                this.selectedFortressHP = null;
+                this.selectedFortressPrice = null;
                 this.gameStarted = false;
                 this.gameEnded = false;
                 this.hasMoved = false;
@@ -759,6 +807,74 @@
                 this.initBoard();
                 this.generateObstacles();
                 this.updateUI();
+            }
+
+            onBodyClick(e) {
+                if (this.fortressPlaceMode && this.selectedFortressType && e.target.classList.contains('cell') && !e.target.classList.contains('river')) {
+                    const x = parseInt(e.target.dataset.x);
+                    const y = parseInt(e.target.dataset.y);
+                    const cellData = this.getCell(x, y);
+                    if (cellData && !cellData.piece) {
+                        this.placeFortress(x, y);
+                    }
+                }
+            }
+
+            toggleFortressMode() {
+                if (this.hasMoved) {
+                    alert('本回合已经行动过了！');
+                    return;
+                }
+                this.fortressPlaceMode = !this.fortressPlaceMode;
+                this.selectedPiece = null;
+                this.selectedGroup = [];
+                this.groupSelectMode = false;
+                document.getElementById('fortress-selector').classList.toggle('show', this.fortressPlaceMode);
+                document.getElementById('fortress-hint').style.display = this.fortressPlaceMode ? 'block' : 'none';
+                document.getElementById('game-hint').textContent = this.fortressPlaceMode ? '选择堡垒类型，然后点击空格放置' : '点击你的棋子选择';
+                this.renderBoard();
+            }
+
+            selectFortressType(type, hp, price) {
+                this.selectedFortressType = type;
+                this.selectedFortressHP = hp;
+                this.selectedFortressPrice = price;
+                alert(`选中 ${this.roleTypes[type].name} 堡垒 (HP:${hp}, 价格:${price}💰)`);
+            }
+
+            placeFortress(x, y) {
+                if (!this.selectedFortressType) {
+                    alert('请先选择堡垒类型！');
+                    return;
+                }
+                if (this.playerWealth[this.currentPlayer - 1] < this.selectedFortressPrice) {
+                    alert('财富不足！');
+                    return;
+                }
+                const baseRole = this.roleTypes[this.selectedFortressType];
+                const fortress = {
+                    ...baseRole,
+                    hp: this.selectedFortressHP,
+                    currentHP: this.selectedFortressHP,
+                    price: this.selectedFortressPrice,
+                    id: Date.now() + Math.random(),
+                    player: this.currentPlayer,
+                    alive: true,
+                    posX: x,
+                    posY: y,
+                    isFortress: true,
+                    speed: 0
+                };
+                this.playerWealth[this.currentPlayer - 1] -= this.selectedFortressPrice;
+                this.playerRoles[this.currentPlayer - 1].push(fortress);
+                this.updateWealthDisplay();
+                this.selectedFortressType = null;
+                this.selectedFortressHP = null;
+                this.selectedFortressPrice = null;
+                this.hasMoved = true;
+                this.renderBoard();
+                this.updateUI();
+                alert(`成功建造 ${fortress.name} 堡垒！`);
             }
 
             showInstructions() {
@@ -1000,7 +1116,7 @@
                     const cell = cellData.element;
                     cell.innerHTML = '';
                     cellData.piece = null;
-                    cell.classList.remove('selected', 'group-selected', 'movable', 'attackable');
+                    cell.classList.remove('selected', 'group-selected', 'movable', 'attackable', 'placeable');
                     
                     if (cellData.obstacle) {
                         const obsEl = document.createElement('div');
@@ -1011,6 +1127,10 @@
                         }
                         cell.appendChild(obsEl);
                     }
+
+                    if (this.fortressPlaceMode && !cellData.piece && cellData.x !== this.riverX) {
+                        cell.classList.add('placeable');
+                    }
                 });
 
                 this.playerRoles.flat().forEach(role => {
@@ -1020,7 +1140,7 @@
                     cellData.piece = role;
                     const cell = cellData.element;
                     const pieceEl = document.createElement('div');
-                    pieceEl.className = `piece player${role.player} ${role.name === '国王' ? 'king' : ''}`;
+                    pieceEl.className = `piece player${role.player} ${role.name === '国王' ? 'king' : ''} ${role.isFortress ? 'fortress' : ''}`;
                     pieceEl.style.backgroundColor = role.color;
                     pieceEl.onclick = (e) => {
                         e.stopPropagation();
@@ -1028,7 +1148,7 @@
                     };
                     const nameEl = document.createElement('div');
                     nameEl.className = 'piece-name';
-                    nameEl.textContent = role.name.charAt(0);
+                    nameEl.textContent = role.isFortress ? 'F' : role.name.charAt(0);
                     const statsEl = document.createElement('div');
                     statsEl.className = 'piece-stats';
                     statsEl.textContent = `${role.currentHP}/${role.hp}`;
@@ -1058,6 +1178,8 @@
                     return;
                 }
                 
+                if (this.fortressPlaceMode) return;
+                
                 if (this.groupSelectMode && role.player === this.currentPlayer) {
                     if (this.selectedGroup.includes(role)) {
                         this.selectedGroup = this.selectedGroup.filter(r => r !== role);
@@ -1066,10 +1188,33 @@
                     }
                     this.updateGroupUI();
                     this.renderBoard();
-                } else if (role.player === this.currentPlayer && !this.groupSelectMode) {
+                } else if (role.player === this.currentPlayer && !this.groupSelectMode && !role.isFortress) {
                     this.selectPiece(role);
+                } else if (role.player === this.currentPlayer && role.isFortress) {
+                    this.selectFortressAttack(role);
                 }
                 this.showPieceInfo(role);
+            }
+
+            selectFortressAttack(fortress) {
+                if (this.hasMoved) {
+                    alert('本回合已经行动过了！');
+                    return;
+                }
+                this.selectedPiece = fortress;
+                this.highlightFortressAttackable();
+                document.getElementById('game-hint').textContent = '点击相邻敌方棋子攻击';
+                this.hasMoved = true;
+            }
+
+            highlightFortressAttackable() {
+                if (!this.selectedPiece || !this.selectedPiece.isFortress) return;
+                const adjacent = this.getAdjacentCells(this.selectedPiece.posX, this.selectedPiece.posY, 1);
+                adjacent.forEach(cell => {
+                    if (cell.piece && cell.piece.player !== this.currentPlayer && cell.piece.alive) {
+                        cell.element.classList.add('attackable');
+                    }
+                });
             }
 
             isAdjacentToGroup(role) {
@@ -1144,8 +1289,8 @@
             }
 
             splitPiece() {
-                if (!this.selectedPiece || this.hasMoved) {
-                    alert('本回合已经移动过了！');
+                if (!this.selectedPiece || this.hasMoved || this.selectedPiece.isFortress) {
+                    alert('本回合已经移动过了或不可拆分！');
                     return;
                 }
                 
@@ -1211,7 +1356,7 @@
             }
 
             showPieceInfo(role) {
-                const text = `名称: ${role.name}\nHP: ${role.currentHP}/${role.hp}\nATK: ${role.tempATK || role.atk}\n速度: ${role.speed}\n玩家: 玩家${role.player}`;
+                const text = `名称: ${role.name}${role.isFortress ? ' (堡垒)' : ''}\nHP: ${role.currentHP}/${role.hp}\nATK: ${role.tempATK || role.atk}\n速度: ${role.speed}\n玩家: 玩家${role.player}`;
                 document.getElementById('piece-info-text').textContent = text;
                 document.getElementById('piece-info').classList.add('show');
             }
@@ -1229,10 +1374,13 @@
                     return;
                 }
                 
+                if (this.fortressPlaceMode) return;
+                
                 if (this.selectedPiece && !this.hasMoved && this.selectedPiece.player === this.currentPlayer) {
                     const distance = this.getManhattanDistance(this.selectedPiece.posX, this.selectedPiece.posY, x, y);
+                    const speed = this.selectedPiece.isFortress ? 1 : this.selectedPiece.speed;
                     
-                    if (distance <= this.selectedPiece.speed) {
+                    if (distance <= speed && distance > 0) {
                         if (!cellData.piece) {
                             this.movePiece(this.selectedPiece, x, y);
                             this.checkAdjacentEnemies(this.selectedPiece);
@@ -1246,7 +1394,6 @@
                             this.hasMoved = true;
                             this.selectedPiece = null;
                             document.getElementById('action-buttons').style.display = 'none';
-                            // 优化: 延迟渲染以避免卡顿
                             setTimeout(() => {
                                 this.renderBoard();
                                 this.checkWin();
@@ -1270,8 +1417,12 @@
             }
 
             attackPiece(attacker, defender, defX, defY) {
-                const atkDamage = attacker.tempATK || attacker.atk;
-                const defDamage = defender.tempATK || defender.atk;
+                let atkDamage = attacker.tempATK || attacker.atk;
+                let defDamage = defender.tempATK || defender.atk;
+                
+                if (defender.isFortress) {
+                    defDamage = Math.floor(defDamage / 2);
+                }
                 
                 defender.currentHP -= atkDamage;
                 attacker.currentHP -= defDamage;
@@ -1287,12 +1438,10 @@
                     attacker.alive = false;
                 }
 
-                // 如果防御方死亡且攻击方存活，则攻击方移动到防御方位置
                 if (defenderDied && attacker.alive) {
                     this.movePiece(attacker, defX, defY);
                 }
                 
-                // 如果击败了国王，标记为胜利攻击
                 if (defenderDied && defender.name === '国王') {
                     setTimeout(() => this.playVictorySound(), 100);
                 }
@@ -1322,7 +1471,7 @@
                 if (!this.selectedPiece) return;
                 const sx = this.selectedPiece.posX;
                 const sy = this.selectedPiece.posY;
-                const speed = this.selectedPiece.speed;
+                const speed = this.selectedPiece.isFortress ? 0 : this.selectedPiece.speed;
                 
                 for (let y = 0; y < this.boardHeight; y++) {
                     for (let x = 0; x < this.boardWidth; x++) {
@@ -1342,6 +1491,7 @@
             }
 
             movePiece(piece, tx, ty) {
+                if (piece.isFortress) return; // 堡垒不可移动
                 const fromCell = this.getCell(piece.posX, piece.posY);
                 if (fromCell) fromCell.piece = null;
                 
@@ -1432,7 +1582,6 @@
                     if (!confirm) return;
                 }
                 
-                // 清理临时buff
                 this.playerRoles.flat().forEach(role => {
                     if (role.tempATK) delete role.tempATK;
                 });
@@ -1441,6 +1590,12 @@
                 this.selectedPiece = null;
                 this.selectedGroup = [];
                 this.groupSelectMode = false;
+                this.fortressPlaceMode = false;
+                this.selectedFortressType = null;
+                this.selectedFortressHP = null;
+                this.selectedFortressPrice = null;
+                document.getElementById('fortress-selector').classList.remove('show');
+                document.getElementById('fortress-hint').style.display = 'none';
                 this.hasMoved = false;
                 document.getElementById('action-buttons').style.display = 'none';
                 this.updateGroupUI();
@@ -1475,7 +1630,6 @@
                     document.getElementById('game-hint').textContent = this.selectedPiece ? 
                         '点击可达格子移动/攻击' : '点击你的棋子选择';
 
-                    // 更新事件抽取UI
                     const currentDraws = this.eventDraws[this.currentPlayer - 1];
                     document.getElementById('event-draws').textContent = currentDraws;
                     document.getElementById('draw-event-btn').disabled = currentDraws <= 0 || this.gameEnded;
@@ -1488,6 +1642,10 @@
                 this.selectedPiece = null;
                 this.selectedGroup = [];
                 this.groupSelectMode = false;
+                this.fortressPlaceMode = false;
+                this.selectedFortressType = null;
+                this.selectedFortressHP = null;
+                this.selectedFortressPrice = null;
                 this.currentPlayer = 1;
                 this.setupPlayer = 1;
                 this.gameStarted = false;
@@ -1500,6 +1658,8 @@
                 document.body.classList.remove('game-active');
                 document.getElementById('start-game-btn').disabled = true;
                 document.getElementById('action-buttons').style.display = 'none';
+                document.getElementById('fortress-selector').classList.remove('show');
+                document.getElementById('fortress-hint').style.display = 'none';
                 this.initBoard();
                 this.generateObstacles();
                 this.renderBoard();
