@@ -686,6 +686,75 @@
                             <div>玩家2棋子: <span id="p2-pieces-game">0</span></div>
                         </div>
                     </div>
+                    <div class="section">
+                        <h3>🛒 补充棋子 (最多9个)</h3>
+                        <div class="wealth-display">
+                            剩余财富: <span id="game-wealth">1500</span>💰
+                        </div>
+                        <div class="role-info" style="border-color: #4CAF50;">
+                            <div>
+                                <b>士兵</b> 基础HP:80 ATK:15 速度:2
+                            </div>
+                            <div class="role-price">50💰</div>
+                        </div>
+                        <div class="hp-selector">
+                            <div class="hp-option" onclick="game.buyPieceInGame('soldier', 80, 50)">80HP<br>50💰</div>
+                            <div class="hp-option" onclick="game.buyPieceInGame('soldier', 100, 70)">100HP<br>70💰</div>
+                            <div class="hp-option" onclick="game.buyPieceInGame('soldier', 120, 90)">120HP<br>90💰</div>
+                        </div>
+                        
+                        <div class="role-info" style="border-color: #2196F3; margin-top: 10px;">
+                            <div>
+                                <b>谋士</b> 基础HP:60 ATK:25 速度:3
+                            </div>
+                            <div class="role-price">80💰</div>
+                        </div>
+                        <div class="hp-selector">
+                            <div class="hp-option" onclick="game.buyPieceInGame('strategist', 60, 80)">60HP<br>80💰</div>
+                            <div class="hp-option" onclick="game.buyPieceInGame('strategist', 80, 110)">80HP<br>110💰</div>
+                            <div class="hp-option" onclick="game.buyPieceInGame('strategist', 100, 140)">100HP<br>140💰</div>
+                        </div>
+                        
+                        <div class="role-info" style="border-color: #F44336; margin-top: 10px;">
+                            <div>
+                                <b>将军</b> 基础HP:100 ATK:20 速度:2
+                            </div>
+                            <div class="role-price">100💰</div>
+                        </div>
+                        <div class="hp-selector">
+                            <div class="hp-option" onclick="game.buyPieceInGame('general', 100, 100)">100HP<br>100💰</div>
+                            <div class="hp-option" onclick="game.buyPieceInGame('general', 130, 140)">130HP<br>140💰</div>
+                            <div class="hp-option" onclick="game.buyPieceInGame('general', 160, 180)">160HP<br>180💰</div>
+                        </div>
+                        
+                        <div class="role-info" style="border-color: #9C27B0; margin-top: 10px;">
+                            <div>
+                                <b>工人</b> 基础HP:70 ATK:10 速度:4
+                            </div>
+                            <div class="role-price">60💰</div>
+                        </div>
+                        <div class="hp-selector">
+                            <div class="hp-option" onclick="game.buyPieceInGame('worker', 70, 60)">70HP<br>60💰</div>
+                            <div class="hp-option" onclick="game.buyPieceInGame('worker', 90, 85)">90HP<br>85💰</div>
+                            <div class="hp-option" onclick="game.buyPieceInGame('worker', 110, 110)">110HP<br>110💰</div>
+                        </div>
+                        
+                        <div class="role-info" style="border-color: #FF9800; margin-top: 10px;">
+                            <div>
+                                <b>刺客</b> 基础HP:50 ATK:30 速度:3
+                            </div>
+                            <div class="role-price">90💰</div>
+                        </div>
+                        <div class="hp-selector">
+                            <div class="hp-option" onclick="game.buyPieceInGame('assassin', 50, 90)">50HP<br>90💰</div>
+                            <div class="hp-option" onclick="game.buyPieceInGame('assassin', 70, 125)">70HP<br>125💰</div>
+                            <div class="hp-option" onclick="game.buyPieceInGame('assassin', 90, 160)">90HP<br>160💰</div>
+                        </div>
+
+                        <div style="margin-top: 10px; font-size: 11px;">
+                            当前: <span id="game-piece-count">0</span>/9
+                        </div>
+                    </div>
 
                     <div class="section">
                         <h3>📖 完整游戏说明</h3>
@@ -944,6 +1013,77 @@
                 this.initBoard();
                 this.generateObstacles();
                 this.updateUI();
+            }
+
+            buyPieceInGame(type, hp, price) {
+                if (this.hasMoved) {
+                    alert('本回合已经行动过了！');
+                    return;
+                }
+                const nonKingAlive = this.playerRoles[this.currentPlayer - 1].filter(r => r.alive && r.name !== '国王').length;
+                if (nonKingAlive >= 9) {
+                    alert('最多9个棋子！');
+                    return;
+                }
+                if (this.playerWealth[this.currentPlayer - 1] < price) {
+                    alert('财富不足！');
+                    return;
+                }
+                const baseRole = this.roleTypes[type];
+                const role = {
+                    ...baseRole,
+                    hp: hp,
+                    currentHP: hp,
+                    price: price,
+                    id: Date.now() + Math.random(),
+                    player: this.currentPlayer,
+                    alive: true
+                };
+                if (type === 'strategist') {
+                    role.attackedTargets = new Set();
+                }
+                this.playerRoles[this.currentPlayer - 1].push(role);
+                this.playerWealth[this.currentPlayer - 1] -= price;
+                this.placeNewPiece(role);
+                this.updateWealthDisplay();
+                this.updateGamePieceCount();
+                this.hasMoved = true;
+                this.renderBoard();
+                this.updateUI();
+            }
+
+            placeNewPiece(role) {
+                const backX = this.currentPlayer === 1 ? 0 : this.boardWidth - 1;
+                const secondX = this.currentPlayer === 1 ? 1 : this.boardWidth - 2;
+                const possiblePositions = [];
+                for (let y = 0; y < this.boardHeight; y++) {
+                    const cell = this.getCell(backX, y);
+                    if (cell && !cell.piece && !cell.obstacle) {
+                        possiblePositions.push({x: backX, y});
+                    }
+                }
+                if (possiblePositions.length === 0) {
+                    for (let y = 0; y < this.boardHeight; y++) {
+                        const cell = this.getCell(secondX, y);
+                        if (cell && !cell.piece && !cell.obstacle) {
+                            possiblePositions.push({x: secondX, y});
+                        }
+                    }
+                }
+                if (possiblePositions.length === 0) {
+                    alert('没有空位放置！');
+                    this.playerRoles[this.currentPlayer - 1].pop();
+                    this.playerWealth[this.currentPlayer - 1] += price;
+                    return;
+                }
+                const pos = possiblePositions[Math.floor(Math.random() * possiblePositions.length)];
+                role.posX = pos.x;
+                role.posY = pos.y;
+            }
+
+            updateGamePieceCount() {
+                const nonKingAlive = this.playerRoles[this.currentPlayer - 1].filter(r => r.alive && r.name !== '国王').length;
+                document.getElementById('game-piece-count').textContent = nonKingAlive;
             }
 
             recordAction(action) {
@@ -1510,6 +1650,9 @@
                 document.getElementById('current-wealth').textContent = this.playerWealth[this.setupPlayer - 1];
                 document.getElementById('p1-wealth').textContent = this.playerWealth[0];
                 document.getElementById('p2-wealth').textContent = this.playerWealth[1];
+                if (this.currentPhase === 'game' && document.getElementById('game-wealth')) {
+                    document.getElementById('game-wealth').textContent = this.playerWealth[this.currentPlayer - 1];
+                }
             }
 
             updateSelectedCount() {
@@ -2238,6 +2381,7 @@
                     const currentDraws = this.eventDraws[this.currentPlayer - 1];
                     document.getElementById('event-draws').textContent = currentDraws;
                     document.getElementById('draw-event-btn').disabled = currentDraws <= 0 || this.gameEnded;
+                    this.updateGamePieceCount();
                 }
             }
 
