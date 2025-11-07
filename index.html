@@ -494,6 +494,31 @@
                 transform: translate(var(--dx), var(--dy)) scale(0); 
             }
         }
+        #replay-section {
+            display: block;
+        }
+        .replay-controls {
+            margin-top: 10px;
+        }
+        .replay-controls select, .replay-controls input, .replay-controls button {
+            width: 100%;
+            margin: 5px 0;
+            padding: 8px;
+            border-radius: 4px;
+            border: none;
+        }
+        .replay-controls button {
+            background: #9C27B0;
+        }
+        .replay-controls button:hover {
+            background: #7B1FA2;
+        }
+        #replay-status {
+            font-size: 10px;
+            color: #FFD700;
+            text-align: center;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body onclick="game.onBodyClick(event)">
@@ -523,6 +548,17 @@
 
         <div id="main-content">
             <div id="sidebar">
+                <div class="section" id="replay-section">
+                    <h3>🎥 比赛回放</h3>
+                    <div class="replay-controls">
+                        <input type="file" id="replay-file" accept=".csv,.txt" onchange="game.loadReplay(event)">
+                        <button onclick="game.downloadReplay()">下载录制</button>
+                        <button id="play-replay-btn" onclick="game.playReplay()" disabled>自动播放</button>
+                        <button onclick="game.stopReplay()">停止回放</button>
+                        <div id="replay-status"></div>
+                    </div>
+                </div>
+
                 <div class="phase-setup">
                     <div class="section">
                         <h3>🎮 游戏准备</h3>
@@ -784,6 +820,12 @@
                 this.hasMoved = false;
                 this.audioContext = null;
                 this.eventDraws = [3, 3]; // 玩家1和2各3次抽取
+                this.replay = [];
+                this.replayId = null;
+                this.isReplaying = false;
+                this.replayInterval = null;
+                this.replayStep = 0;
+                this.loadedReplay = null;
                 
                 this.roleTypes = {
                     soldier: { name: '士兵', baseHP: 80, atk: 15, speed: 2, color: '#4CAF50', basePrice: 50 },
@@ -804,7 +846,7 @@
                             if (target.currentHP <= 0) {
                                 target.alive = false;
                             }
-                            alert(`陨石攻击！${target.name} 受到50伤害。`);
+                            if (!game.isReplaying) alert(`陨石攻击！${target.name} 受到50伤害。`);
                         }
                     },
                     {
@@ -813,7 +855,7 @@
                         requiresTarget: false,
                         effect: (game) => {
                             game.playerWealth[game.currentPlayer - 1] += 200;
-                            alert('发现石油！获得200💰财富。');
+                            if (!game.isReplaying) alert('发现石油！获得200💰财富。');
                             game.updateWealthDisplay();
                         }
                     },
@@ -823,7 +865,7 @@
                         requiresTarget: true,
                         effect: (game, target) => {
                             target.currentHP = target.hp;
-                            alert(`神秘治疗！${target.name} HP恢复满值。`);
+                            if (!game.isReplaying) alert(`神秘治疗！${target.name} HP恢复满值。`);
                         }
                     },
                     {
@@ -836,7 +878,7 @@
                                     role.currentHP = Math.max(1, role.currentHP - 10);
                                 }
                             });
-                            alert('地震！所有棋子失去10HP。');
+                            if (!game.isReplaying) alert('地震！所有棋子失去10HP。');
                         }
                     },
                     {
@@ -845,7 +887,7 @@
                         requiresTarget: true,
                         effect: (game, target) => {
                             target.tempATK = (target.tempATK || target.atk) + 20;
-                            alert(`幸运buff！${target.name} ATK临时+20。`);
+                            if (!game.isReplaying) alert(`幸运buff！${target.name} ATK临时+20。`);
                         }
                     }
                 ];
@@ -858,6 +900,141 @@
                 this.updateUI();
             }
 
+            recordAction(action) {
+                if (this.isReplaying) return;
+                this.replay.push({
+                    step: this.replay.length + 1,
+                    timestamp: Date.now(),
+                    currentPlayer: this.currentPlayer,
+                    ...action
+                });
+            }
+
+            downloadReplay() {
+                if (this.replay.length === 0) {
+                    alert('没有录制数据！');
+                    return;
+                }
+                const csvContent = 'step,type,player,pieceId,fromX,fromY,toX,toY,details\n' +
+                    this.replay.map(r => 
+                        `${r.step},"${r.type}",${r.currentPlayer},"${r.pieceId || ''}",${r.fromX || ''},${r.fromY || ''},${r.toX || ''},${r.toY || ''},"${r.details || ''}"`
+                    ).join('\n');
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `replay_${this.replayId || Date.now()}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+
+            loadReplay(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const content = e.target.result;
+                    const lines = content.split('\n').slice(1); // 跳过header
+                    const replayData = lines.map(line => {
+                        const [step, type, player, pieceId, fromX, fromY, toX, toY, details] = line.split(',');
+                        return {
+                            step: parseInt(step),
+                            type: type.replace(/"/g, ''),
+                            currentPlayer: parseInt(player),
+                            pieceId: pieceId.replace(/"/g, ''),
+                            fromX: parseInt(fromX),
+                            fromY: parseInt(fromY),
+                            toX: parseInt(toX),
+                            toY: parseInt(toY),
+                            details: details ? details.replace(/"/g, '') : ''
+                        };
+                    }).filter(r => !isNaN(r.step));
+                    const name = prompt('输入比赛名称：') || `比赛 ${Date.now()}`;
+                    this.loadedReplay = { name, data: replayData };
+                    document.getElementById('play-replay-btn').disabled = false;
+                    document.getElementById('replay-status').textContent = `已加载: ${name}`;
+                };
+                reader.readAsText(file);
+            }
+
+            playReplay() {
+                if (!this.loadedReplay) {
+                    alert('请先加载一个录制文件！');
+                    return;
+                }
+                this.stopReplay();
+                this.isReplaying = true;
+                this.replay = this.loadedReplay.data;
+                this.replayStep = 0;
+                this.resetGame();
+                this.replay = this.loadedReplay.data;
+                // Set initial state for replay based on CSV
+                const king1 = { ...this.roleTypes.king, id: 'king1', currentHP: 150, player: 1, alive: true, posX: 1, posY: 5 };
+                const king2 = { ...this.roleTypes.king, id: 'king2', currentHP: 150, player: 2, alive: true, posX: 16, posY: 5 };
+                this.playerRoles[0] = [king1];
+                this.playerRoles[1] = [king2];
+                this.currentPhase = 'game';
+                this.gameStarted = true;
+                this.gameEnded = false;
+                this.hasMoved = false;
+                this.currentPlayer = 1;
+                document.body.classList.add('game-active');
+                this.renderBoard();
+                this.updateUI();
+                this.startReplay();
+                document.getElementById('play-replay-btn').disabled = true;
+                document.getElementById('replay-status').textContent = '回放中...';
+            }
+
+            startReplay() {
+                this.replayInterval = setInterval(() => {
+                    if (this.replayStep >= this.replay.length) {
+                        this.stopReplay();
+                        return;
+                    }
+                    const action = this.replay[this.replayStep];
+                    this.executeReplayAction(action);
+                    this.replayStep++;
+                    document.getElementById('replay-status').textContent = `步骤 ${this.replayStep}/${this.replay.length}`;
+                }, 1000); // 每步1秒
+            }
+
+            executeReplayAction(action) {
+                this.currentPlayer = action.currentPlayer;
+                switch (action.type) {
+                    case 'move':
+                        const piece = this.playerRoles[this.currentPlayer - 1].find(p => p.id === action.pieceId);
+                        if (piece) this.movePiece(piece, action.toX, action.toY);
+                        break;
+                    case 'attack':
+                        const attacker = this.playerRoles[this.currentPlayer - 1].find(p => p.id === action.pieceId);
+                        const defenderCell = this.getCell(action.toX, action.toY);
+                        const defender = defenderCell ? defenderCell.piece : null;
+                        if (attacker && defender) this.attackPiece(attacker, defender, action.toX, action.toY);
+                        break;
+                    case 'endTurn':
+                        this.endTurn();
+                        break;
+                    // 添加其他action类型如split, groupAttack等
+                    default:
+                        break;
+                }
+                this.renderBoard();
+                this.updateUI();
+            }
+
+            stopReplay() {
+                if (this.replayInterval) {
+                    clearInterval(this.replayInterval);
+                    this.replayInterval = null;
+                }
+                this.isReplaying = false;
+                document.getElementById('play-replay-btn').disabled = !this.loadedReplay;
+                document.getElementById('replay-status').textContent = '回放停止';
+            }
+
             onBodyClick(e) {
                 if (this.fortressPlaceMode && this.selectedFortressType && e.target.classList.contains('cell') && !e.target.classList.contains('river')) {
                     const x = parseInt(e.target.dataset.x);
@@ -865,6 +1042,7 @@
                     const cellData = this.getCell(x, y);
                     if (cellData && !cellData.piece) {
                         this.placeFortress(x, y);
+                        this.recordAction({ type: 'placeFortress', pieceId: this.selectedFortressType, x, y });
                     }
                 }
             }
@@ -923,7 +1101,7 @@
                 this.hasMoved = true;
                 this.renderBoard();
                 this.updateUI();
-                alert(`成功建造 ${fortress.name} 堡垒！`);
+                if (!this.isReplaying) alert(`成功建造 ${fortress.name} 堡垒！`);
             }
 
             showInstructions() {
@@ -1026,7 +1204,7 @@
                         cell.dataset.x = x;
                         cell.dataset.y = y;
                         cell.onclick = (e) => {
-                            if (e.target === cell) {
+                            if (e.target === cell && !this.isReplaying) {
                                 this.onCellClick(parseInt(cell.dataset.x), parseInt(cell.dataset.y));
                             }
                         };
@@ -1146,6 +1324,8 @@
             }
 
             startGame() {
+                this.replayId = Date.now();
+                this.replay = [];
                 const king1 = { ...this.roleTypes.king, id: 'king1', currentHP: 150, player: 1, alive: false };
                 this.playerRoles[0].push(king1);
                 const king2 = { ...this.roleTypes.king, id: 'king2', currentHP: 150, player: 2, alive: false };
@@ -1252,7 +1432,7 @@
                     pieceEl.style.backgroundColor = role.color;
                     pieceEl.onclick = (e) => {
                         e.stopPropagation();
-                        this.onPieceClick(role);
+                        if (!this.isReplaying) this.onPieceClick(role);
                     };
                     const nameEl = document.createElement('div');
                     nameEl.className = 'piece-name';
@@ -1265,7 +1445,7 @@
                     cell.appendChild(pieceEl);
                 });
 
-                if (this.selectedPiece) {
+                if (this.selectedPiece && !this.isReplaying) {
                     const cell = this.getCell(this.selectedPiece.posX, this.selectedPiece.posY);
                     if (cell) cell.element.classList.add('selected');
                     this.highlightMovable();
@@ -1278,7 +1458,7 @@
             }
 
             onPieceClick(role) {
-                if (this.currentPhase !== 'game' || this.gameEnded) return;
+                if (this.currentPhase !== 'game' || this.gameEnded || this.isReplaying) return;
                 
                 if (this.eventTargetMode && this.currentEvent && this.currentEvent.requiresTarget) {
                     this.currentEvent.effect(this, role);
@@ -1368,12 +1548,13 @@
                         r.currentHP = Math.max(1, r.currentHP - 10);
                         if (r.tempATK) delete r.tempATK;
                     });
-                    alert(`组队攻击成功！击败了${target.name}`);
+                    if (!this.isReplaying) alert(`组队攻击成功！击败了${target.name}`);
                 } else {
                     this.selectedGroup.forEach(r => r.alive = false);
-                    alert('组队攻击失败，所有攻击棋子阵亡！');
+                    if (!this.isReplaying) alert('组队攻击失败，所有攻击棋子阵亡！');
                 }
                 
+                this.recordAction({ type: 'groupAttack', groupSize: this.selectedGroup.length, targetId: target.id });
                 this.selectedGroup = [];
                 this.groupSelectMode = false;
                 this.hasMoved = true;
@@ -1443,7 +1624,8 @@
                 document.getElementById('action-buttons').style.display = 'none';
                 this.renderBoard();
                 this.updateUI();
-                alert(`成功拆分成${numSplit}个棋子！`);
+                if (!this.isReplaying) alert(`成功拆分成${numSplit}个棋子！`);
+                this.recordAction({ type: 'split', pieceId: this.selectedPiece.id, numSplit });
             }
 
             getAdjacentCells(x, y, distance = 1) {
@@ -1470,7 +1652,7 @@
             }
 
             onCellClick(x, y) {
-                if (this.currentPhase !== 'game' || this.gameEnded) return;
+                if (this.currentPhase !== 'game' || this.gameEnded || this.isReplaying) return;
                 const cellData = this.getCell(x, y);
                 if (!cellData) return;
                 
@@ -1490,6 +1672,7 @@
                     
                     if (distance <= speed && distance > 0) {
                         if (!cellData.piece) {
+                            this.recordAction({ type: 'move', pieceId: this.selectedPiece.id, fromX: this.selectedPiece.posX, fromY: this.selectedPiece.posY, toX: x, toY: y });
                             this.movePiece(this.selectedPiece, x, y);
                             this.checkAdjacentEnemies(this.selectedPiece);
                             this.hasMoved = true;
@@ -1498,6 +1681,7 @@
                             this.renderBoard();
                             this.checkWin();
                         } else if (cellData.piece.player !== this.currentPlayer) {
+                            this.recordAction({ type: 'attack', pieceId: this.selectedPiece.id, fromX: this.selectedPiece.posX, fromY: this.selectedPiece.posY, toX: x, toY: y });
                             this.attackPiece(this.selectedPiece, cellData.piece, x, y);
                             this.hasMoved = true;
                             this.selectedPiece = null;
@@ -1519,6 +1703,7 @@
                 const adjacent = this.getAdjacentCells(piece.posX, piece.posY, 1);
                 adjacent.forEach(cell => {
                     if (cell.piece && cell.piece.player !== piece.player && cell.piece.alive) {
+                        this.recordAction({ type: 'attack', pieceId: piece.id, fromX: piece.posX, fromY: piece.posY, toX: cell.piece.posX, toY: cell.piece.posY });
                         this.attackPiece(piece, cell.piece, cell.piece.posX, cell.piece.posY);
                     }
                 });
@@ -1618,10 +1803,10 @@
                         toCell.obstacle.revealed = true;
                         if (toCell.obstacle.type === 'heal') {
                             piece.currentHP = Math.min(piece.hp, piece.currentHP + toCell.obstacle.amount);
-                            alert(`获得治疗 +${toCell.obstacle.amount} HP！`);
+                            if (!this.isReplaying) alert(`获得治疗 +${toCell.obstacle.amount} HP！`);
                         } else {
                             piece.currentHP = Math.max(1, piece.currentHP - toCell.obstacle.amount);
-                            alert(`受到伤害 -${toCell.obstacle.amount} HP！`);
+                            if (!this.isReplaying) alert(`受到伤害 -${toCell.obstacle.amount} HP！`);
                         }
                     }
                 }
@@ -1638,6 +1823,12 @@
                         document.getElementById('winner-banner').classList.add('show');
                         this.gameEnded = true;
                         this.playVictorySound();
+                        this.recordAction({ type: 'win', winner });
+                        setTimeout(() => {
+                            if (this.replay.length > 0) {
+                                this.downloadReplay();
+                            }
+                        }, 2000);
                         return;
                     }
                 }
@@ -1665,11 +1856,13 @@
                 descEl.textContent = `${randomEvent.name}: ${randomEvent.description}`;
                 descEl.style.display = 'block';
 
+                this.recordAction({ type: 'drawEvent', eventName: randomEvent.name });
+
                 if (randomEvent.requiresTarget) {
                     this.eventTargetMode = true;
                     document.getElementById('event-target-hint').style.display = 'block';
                     document.getElementById('game-hint').textContent = '点击棋盘上任意棋子应用事件';
-                    alert(`抽取到: ${randomEvent.name}\n${randomEvent.description}\n点击任意棋子应用。`);
+                    if (!this.isReplaying) alert(`抽取到: ${randomEvent.name}\n${randomEvent.description}\n点击任意棋子应用。`);
                 } else {
                     randomEvent.effect(this);
                     this.renderBoard();
@@ -1689,10 +1882,12 @@
             }
 
             endTurn() {
-                if (!this.hasMoved && this.selectedPiece) {
+                if (!this.hasMoved && this.selectedPiece && !this.isReplaying) {
                     const confirm = window.confirm('还没有移动棋子，确定要结束回合吗？');
                     if (!confirm) return;
                 }
+                
+                this.recordAction({ type: 'endTurn' });
                 
                 this.playerRoles.flat().forEach(role => {
                     if (role.tempATK) delete role.tempATK;
@@ -1767,6 +1962,12 @@
                 this.eventDraws = [3, 3];
                 this.currentEvent = null;
                 this.eventTargetMode = false;
+                this.replay = [];
+                this.replayId = null;
+                this.loadedReplay = null;
+                this.stopReplay();
+                document.getElementById('play-replay-btn').disabled = true;
+                document.getElementById('replay-status').textContent = '';
                 document.body.classList.remove('game-active');
                 document.getElementById('start-game-btn').disabled = true;
                 document.getElementById('action-buttons').style.display = 'none';
@@ -1784,6 +1985,11 @@
         }
 
         const game = new Game();
+        window.addEventListener('beforeunload', function() {
+            if (game.replay.length > 0 && game.gameStarted && !game.isReplaying) {
+                game.downloadReplay();
+            }
+        });
     </script>
 </body>
 </html>
