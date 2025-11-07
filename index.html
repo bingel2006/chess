@@ -175,6 +175,11 @@
             border: 3px solid #8B4513;
             box-shadow: 0 0 10px #8B4513;
         }
+        .piece.wall {
+            border-radius: 0;
+            clip-path: none;
+            background: linear-gradient(#8B4513, #A0522D);
+        }
         .piece-name {
             font-size: 11px;
             margin-bottom: 2px;
@@ -186,6 +191,14 @@
         .piece.king {
             border: 4px solid gold;
             box-shadow: 0 0 15px gold;
+        }
+        .piece.supply {
+            background: repeating-linear-gradient(45deg, #90EE90, #90EE90 5px, #228B22 5px, #228B22 10px);
+            clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+        }
+        .piece.farm {
+            background: linear-gradient(135deg, #32CD32, #228B22);
+            clip-path: polygon(20% 0%, 80% 0%, 100% 30%, 100% 100%, 0% 100%, 0% 30%);
         }
         .obstacle {
             position: absolute;
@@ -525,12 +538,12 @@
     <div id="container">
         <div id="top-bar">
             <div class="player-info player1-color" id="player1-info">
-                玩家1 | 财富: <span id="p1-wealth">1000</span>💰<br>
+                玩家1 | 财富: <span id="p1-wealth">1500</span>💰<br>
                 <span class="turn-status">准备中</span>
             </div>
             <button onclick="game.resetGame()" style="width: 150px;">重新开始</button>
             <div class="player-info player2-color" id="player2-info">
-                玩家2 | 财富: <span id="p2-wealth">1000</span>💰<br>
+                玩家2 | 财富: <span id="p2-wealth">1500</span>💰<br>
                 <span class="turn-status">准备中</span>
             </div>
         </div>
@@ -566,7 +579,7 @@
                             当前: <span id="setup-player">玩家1</span> 选择角色
                         </div>
                         <div class="wealth-display">
-                            剩余财富: <span id="current-wealth">1000</span>💰
+                            剩余财富: <span id="current-wealth">1500</span>💰
                         </div>
                         <button onclick="game.switchSetupPlayer()">切换玩家</button>
                         <button id="obs-btn" onclick="game.regenerateObstacles()">随机生成障碍物</button>
@@ -654,7 +667,7 @@
                     <div class="section">
                         <h3>ℹ️ 游戏说明</h3>
                         <div style="font-size: 10px; line-height: 1.6;">
-                            <div>• 双方各有1000💰财富</div>
+                            <div>• 双方各有1500💰财富</div>
                             <div>• 购买角色时可选择不同HP等级</div>
                             <div>• HP越高价格越贵</div>
                             <div>• 最多9个棋子+1个国王</div>
@@ -702,6 +715,27 @@
                     </div>
 
                     <div class="section">
+                        <h3>🧱 建造城墙</h3>
+                        <div>每个50💰，阻挡对方通过</div>
+                        <button class="action-btn" onclick="game.toggleWallMode()">切换墙模式</button>
+                        <div id="wall-hint" style="font-size: 10px; color: #FF9800; margin-top: 5px; display: none;">点击空置棋格放置城墙</div>
+                    </div>
+
+                    <div class="section">
+                        <h3>🏥 建造补给站</h3>
+                        <div>使用100💰在空格建造补给站，己方进入满血恢复</div>
+                        <button class="action-btn" onclick="game.toggleSupplyMode()">切换补给模式</button>
+                        <div id="supply-hint" style="font-size: 10px; color: #FF9800; margin-top: 5px; display: none;">点击空置棋格放置补给站</div>
+                    </div>
+
+                    <div class="section">
+                        <h3>🌾 建造农田</h3>
+                        <div>50💰，每回合+50💰，HP:20</div>
+                        <button class="action-btn" onclick="game.toggleFarmMode()">切换农田模式</button>
+                        <div id="farm-hint" style="font-size: 10px; color: #FF9800; margin-top: 5px; display: none;">点击空置棋格放置农田</div>
+                    </div>
+
+                    <div class="section">
                         <h3>🎯 操作提示</h3>
                         <div style="font-size: 11px; line-height: 1.6; margin-bottom: 10px;">
                             <div id="game-hint">点击你的棋子选择，然后点击可达格子移动</div>
@@ -745,7 +779,7 @@
 
 ### 1. 准备阶段
 - 双方轮流购买棋子（最多9个 + 1国王自动添加）。
-- 初始财富：1000💰。
+- 初始财富：1500💰。
 - 棋子类型：士兵、谋士、将军、工人、刺客。
 - 选择 HP 等级，价格越高 HP 越高（升级选项见购买界面）。
 - 完成选择后，棋子随机放置在后排（避免障碍）。
@@ -761,6 +795,12 @@
   - **拆分棋子**：选棋子后点击按钮，随机拆分成2-4个子单位（HP 均分，需周边空位）。视为本回合行动。
   - **组队攻击**：切换组队模式，点击相邻你的棋子选组（橙色高亮，≥2个），点击相邻敌方执行。总 ATK vs 目标 HP：成功击败目标（攻击方 -10 HP），失败全死。
   - **建造堡垒**：切换堡垒模式，选择类型（2倍原价），点击空置格子放置。堡垒不可移动（速度=0），可攻击相邻敌方；被攻击伤害减半。视为本回合行动。
+  - **建造城墙**：切换墙模式，点击空位放置（50💰），阻挡敌方通过，但不能完全闭合（相邻墙≥3不可建）。
+  - **建造补给站**：切换补给模式，点击空位放置（100💰），己方棋子进入该格满血恢复。
+  - **建造农田**：切换农田模式，点击空位放置（50💰），每回合结束生产50💰，HP:20，被攻击后归属攻击方。
+  - **工人特殊**：可在城墙旁（相邻）拆除敌方城墙，耗费如攻击棋子（互损）。
+  - **刺客特殊**：攻击伤害为ATK的0.5/1/2倍（随机，等概率）。
+  - **谋士特殊**：对同一敌方棋子攻击2次后，该棋子叛变加入己方（外形变为己方形状）。
 - **随机事件**：每玩家3次抽取（回合内用，视为行动）。抽取后若需目标，点击任意棋子应用。
   - 陨石攻击：-50 HP 给选棋子。
   - 发现石油：+200💰 财富。
@@ -772,12 +812,15 @@
 | 棋子 | 基础 HP | ATK | 速度 | 颜色 | 基础价格 | 说明 |
 |------|---------|-----|------|------|----------|------|
 | 士兵 | 80 | 15 | 2 | 绿色 | 50💰 | 平衡肉盾。 |
-| 谋士 | 60 | 25 | 3 | 蓝色 | 80💰 | 高输出，机动。 |
+| 谋士 | 60 | 25 | 3 | 蓝色 | 80💰 | 高输出，机动；2次攻击同一敌致叛变。 |
 | 将军 | 100 | 20 | 2 | 红色 | 100💰 | 高耐久坦克。 |
-| 工人 | 70 | 10 | 4 | 紫色 | 60💰 | 高速侦察。 |
-| 刺客 | 50 | 30 | 3 | 橙色 | 90💰 | 脆皮秒杀。 |
+| 工人 | 70 | 10 | 4 | 紫色 | 60💰 | 高速侦察；可拆城墙。 |
+| 刺客 | 50 | 30 | 3 | 橙色 | 90💰 | 脆皮秒杀；伤害随机0.5/1/2倍。 |
 | 国王 | 150 | 30 | 2 | 金色 | 无 | 核心，反击强。 |
 | 堡垒 | 变 | 变 | 0 | 棕色边框 | 2倍 | 静态防御塔，可近攻。 |
+| 城墙 | 50 | 0 | 0 | 棕色 | 50💰 | 阻挡通过，不可移动；工人可拆。 |
+| 补给站 | 50 | 0 | 0 | 绿色条纹 | 100💰 | 满血恢复，不可移动。 |
+| 农田 | 20 | 0 | 0 | 绿色梯形 | 50💰 | 每回合+50💰，被攻归属。 |
 
 - HP 升级增加价格（e.g., 士兵 100HP=70💰）。
 - currentHP：当前生命，≤0 死亡移除。
@@ -806,12 +849,15 @@
                 this.currentPhase = 'setup';
                 this.setupPlayer = 1;
                 this.playerRoles = [[], []];
-                this.playerWealth = [1000, 1000];
+                this.playerWealth = [1500, 1500];
                 this.currentPlayer = 1;
                 this.selectedPiece = null;
                 this.selectedGroup = [];
                 this.groupSelectMode = false;
                 this.fortressPlaceMode = false;
+                this.wallMode = false;
+                this.supplyPlaceMode = false;
+                this.farmMode = false;
                 this.selectedFortressType = null;
                 this.selectedFortressHP = null;
                 this.selectedFortressPrice = null;
@@ -1045,6 +1091,179 @@
                         this.recordAction({ type: 'placeFortress', pieceId: this.selectedFortressType, x, y });
                     }
                 }
+                if (this.supplyPlaceMode && e.target.classList.contains('cell') && !e.target.classList.contains('river')) {
+                    const x = parseInt(e.target.dataset.x);
+                    const y = parseInt(e.target.dataset.y);
+                    const cellData = this.getCell(x, y);
+                    if (cellData && !cellData.piece) {
+                        this.placeSupply(x, y);
+                        this.recordAction({ type: 'placeSupply', x, y });
+                    }
+                }
+                if (this.farmMode && e.target.classList.contains('cell') && !e.target.classList.contains('river')) {
+                    const x = parseInt(e.target.dataset.x);
+                    const y = parseInt(e.target.dataset.y);
+                    const cellData = this.getCell(x, y);
+                    if (cellData && !cellData.piece) {
+                        this.placeFarm(x, y);
+                        this.recordAction({ type: 'placeFarm', x, y });
+                    }
+                }
+                if (this.wallMode && e.target.classList.contains('cell') && !e.target.classList.contains('river')) {
+                    const x = parseInt(e.target.dataset.x);
+                    const y = parseInt(e.target.dataset.y);
+                    const cellData = this.getCell(x, y);
+                    if (cellData && !cellData.piece) {
+                        this.placeWall(x, y);
+                    }
+                }
+            }
+
+            toggleSupplyMode() {
+                if (this.hasMoved) {
+                    alert('本回合已经行动过了！');
+                    return;
+                }
+                this.supplyPlaceMode = !this.supplyPlaceMode;
+                this.selectedPiece = null;
+                this.selectedGroup = [];
+                this.groupSelectMode = false;
+                this.fortressPlaceMode = false;
+                this.wallMode = false;
+                this.farmMode = false;
+                document.getElementById('supply-hint').style.display = this.supplyPlaceMode ? 'block' : 'none';
+                document.getElementById('game-hint').textContent = this.supplyPlaceMode ? '点击空位放置补给站' : '点击你的棋子选择';
+                this.renderBoard();
+            }
+
+            placeSupply(x, y) {
+                if (this.playerWealth[this.currentPlayer - 1] < 100) {
+                    alert('财富不足！');
+                    return;
+                }
+                const supply = {
+                    name: '补给站',
+                    hp: 50,
+                    currentHP: 50,
+                    atk: 0,
+                    speed: 0,
+                    color: '#00FF00',
+                    id: Date.now() + Math.random(),
+                    player: this.currentPlayer,
+                    alive: true,
+                    posX: x,
+                    posY: y,
+                    isSupply: true
+                };
+                this.playerRoles[this.currentPlayer - 1].push(supply);
+                this.playerWealth[this.currentPlayer - 1] -= 100;
+                this.updateWealthDisplay();
+                this.hasMoved = true;
+                this.supplyPlaceMode = false;
+                document.getElementById('supply-hint').style.display = 'none';
+                this.renderBoard();
+                this.updateUI();
+                if (!this.isReplaying) alert('补给站已建造！');
+            }
+
+            toggleFarmMode() {
+                if (this.hasMoved) {
+                    alert('本回合已经行动过了！');
+                    return;
+                }
+                this.farmMode = !this.farmMode;
+                this.selectedPiece = null;
+                this.selectedGroup = [];
+                this.groupSelectMode = false;
+                this.fortressPlaceMode = false;
+                this.wallMode = false;
+                this.supplyPlaceMode = false;
+                document.getElementById('farm-hint').style.display = this.farmMode ? 'block' : 'none';
+                document.getElementById('game-hint').textContent = this.farmMode ? '点击空位放置农田' : '点击你的棋子选择';
+                this.renderBoard();
+            }
+
+            placeFarm(x, y) {
+                if (this.playerWealth[this.currentPlayer - 1] < 50) {
+                    alert('财富不足！');
+                    return;
+                }
+                const farm = {
+                    name: '农田',
+                    hp: 20,
+                    currentHP: 20,
+                    atk: 0,
+                    speed: 0,
+                    color: '#32CD32',
+                    id: Date.now() + Math.random(),
+                    player: this.currentPlayer,
+                    alive: true,
+                    posX: x,
+                    posY: y,
+                    isFarm: true
+                };
+                this.playerRoles[this.currentPlayer - 1].push(farm);
+                this.playerWealth[this.currentPlayer - 1] -= 50;
+                this.updateWealthDisplay();
+                this.hasMoved = true;
+                this.farmMode = false;
+                document.getElementById('farm-hint').style.display = 'none';
+                this.renderBoard();
+                this.updateUI();
+                if (!this.isReplaying) alert('农田已建造！');
+            }
+
+            toggleWallMode() {
+                if (this.hasMoved) {
+                    alert('本回合已经行动过了！');
+                    return;
+                }
+                this.wallMode = !this.wallMode;
+                this.selectedPiece = null;
+                this.selectedGroup = [];
+                this.groupSelectMode = false;
+                this.fortressPlaceMode = false;
+                this.supplyPlaceMode = false;
+                this.farmMode = false;
+                document.getElementById('wall-hint').style.display = this.wallMode ? 'block' : 'none';
+                document.getElementById('game-hint').textContent = this.wallMode ? '点击空位放置城墙' : '点击你的棋子选择';
+                this.renderBoard();
+            }
+
+            placeWall(x, y) {
+                if (this.playerWealth[this.currentPlayer - 1] < 50) {
+                    alert('财富不足！');
+                    return;
+                }
+                const adjWalls = this.getAdjacentCells(x, y, 1).filter(cell => cell.piece && cell.piece.isWall).length;
+                if (adjWalls >= 3) {
+                    alert('不能完全闭合！');
+                    return;
+                }
+                const wall = {
+                    name: '城墙',
+                    hp: 50,
+                    currentHP: 50,
+                    atk: 0,
+                    speed: 0,
+                    color: '#8B4513',
+                    id: Date.now() + Math.random(),
+                    player: this.currentPlayer,
+                    alive: true,
+                    posX: x,
+                    posY: y,
+                    isWall: true
+                };
+                this.playerRoles[this.currentPlayer - 1].push(wall);
+                this.playerWealth[this.currentPlayer - 1] -= 50;
+                this.updateWealthDisplay();
+                this.hasMoved = true;
+                this.wallMode = false;
+                document.getElementById('wall-hint').style.display = 'none';
+                this.renderBoard();
+                this.updateUI();
+                if (!this.isReplaying) alert('城墙已建造！');
+                this.recordAction({ type: 'placeWall', x, y });
             }
 
             toggleFortressMode() {
@@ -1056,6 +1275,9 @@
                 this.selectedPiece = null;
                 this.selectedGroup = [];
                 this.groupSelectMode = false;
+                this.wallMode = false;
+                this.supplyPlaceMode = false;
+                this.farmMode = false;
                 document.getElementById('fortress-selector').classList.toggle('show', this.fortressPlaceMode);
                 document.getElementById('fortress-hint').style.display = this.fortressPlaceMode ? 'block' : 'none';
                 document.getElementById('game-hint').textContent = this.fortressPlaceMode ? '选择堡垒类型，然后点击空格放置' : '点击你的棋子选择';
@@ -1092,6 +1314,9 @@
                     isFortress: true,
                     speed: 0
                 };
+                if (this.selectedFortressType === 'strategist') {
+                    fortress.attackedTargets = new Set();
+                }
                 this.playerWealth[this.currentPlayer - 1] -= this.selectedFortressPrice;
                 this.playerRoles[this.currentPlayer - 1].push(fortress);
                 this.updateWealthDisplay();
@@ -1271,6 +1496,9 @@
                     player: this.setupPlayer,
                     alive: false
                 };
+                if (type === 'strategist') {
+                    role.attackedTargets = new Set();
+                }
                 
                 this.playerWealth[this.setupPlayer - 1] -= price;
                 currentRoles.push(role);
@@ -1416,7 +1644,7 @@
                         cell.appendChild(obsEl);
                     }
 
-                    if (this.fortressPlaceMode && !cellData.piece && cellData.x !== this.riverX) {
+                    if ((this.fortressPlaceMode || this.supplyPlaceMode || this.farmMode || this.wallMode) && !cellData.piece && cellData.x !== this.riverX) {
                         cell.classList.add('placeable');
                     }
                 });
@@ -1428,18 +1656,20 @@
                     cellData.piece = role;
                     const cell = cellData.element;
                     const pieceEl = document.createElement('div');
-                    pieceEl.className = `piece player${role.player} ${role.name === '国王' ? 'king' : ''} ${role.isFortress ? 'fortress' : ''}`;
+                    pieceEl.className = `piece player${role.player} ${role.isWall ? 'wall' : ''} ${role.name === '国王' ? 'king' : ''} ${role.isFortress ? 'fortress' : ''} ${role.isSupply ? 'supply' : ''} ${role.isFarm ? 'farm' : ''}`;
                     pieceEl.style.backgroundColor = role.color;
-                    pieceEl.onclick = (e) => {
-                        e.stopPropagation();
-                        if (!this.isReplaying) this.onPieceClick(role);
-                    };
+                    if (!role.isWall && !role.isSupply && !role.isFarm) {
+                        pieceEl.onclick = (e) => {
+                            e.stopPropagation();
+                            if (!this.isReplaying) this.onPieceClick(role);
+                        };
+                    }
                     const nameEl = document.createElement('div');
                     nameEl.className = 'piece-name';
-                    nameEl.textContent = role.isFortress ? 'F' : role.name.charAt(0);
+                    nameEl.textContent = role.isWall ? '墙' : (role.isFortress ? 'F' : (role.isSupply ? 'S' : (role.isFarm ? '农' : role.name.charAt(0))));
                     const statsEl = document.createElement('div');
                     statsEl.className = 'piece-stats';
-                    statsEl.textContent = `${role.currentHP}/${role.hp}`;
+                    statsEl.textContent = role.isWall ? `${role.currentHP}/50` : (role.isSupply ? `${role.currentHP}/50` : (role.isFarm ? `${role.currentHP}/20` : `${role.currentHP}/${role.hp}`));
                     pieceEl.appendChild(nameEl);
                     pieceEl.appendChild(statsEl);
                     cell.appendChild(pieceEl);
@@ -1466,7 +1696,9 @@
                     return;
                 }
                 
-                if (this.fortressPlaceMode) return;
+                if (this.fortressPlaceMode || this.wallMode || this.supplyPlaceMode || this.farmMode) return;
+                
+                if (role.isWall || role.isSupply || role.isFarm) return;
                 
                 if (this.groupSelectMode && role.player === this.currentPlayer) {
                     if (this.selectedGroup.includes(role)) {
@@ -1578,7 +1810,7 @@
             }
 
             splitPiece() {
-                if (!this.selectedPiece || this.hasMoved || this.selectedPiece.isFortress) {
+                if (!this.selectedPiece || this.hasMoved || this.selectedPiece.isFortress || this.selectedPiece.isWall || this.selectedPiece.isSupply || this.selectedPiece.isFarm) {
                     alert('本回合已经移动过了或不可拆分！');
                     return;
                 }
@@ -1616,6 +1848,9 @@
                         posX: shuffled[i].x,
                         posY: shuffled[i].y
                     };
+                    if (originalType === 'strategist') {
+                        newRole.attackedTargets = new Set();
+                    }
                     this.playerRoles[this.selectedPiece.player - 1].push(newRole);
                 }
                 
@@ -1646,7 +1881,7 @@
             }
 
             showPieceInfo(role) {
-                const text = `名称: ${role.name}${role.isFortress ? ' (堡垒)' : ''}\nHP: ${role.currentHP}/${role.hp}\nATK: ${role.tempATK || role.atk}\n速度: ${role.speed}\n玩家: 玩家${role.player}`;
+                const text = `名称: ${role.name}${role.isFortress ? ' (堡垒)' : ''}${role.isWall ? ' (城墙)' : ''}${role.isSupply ? ' (补给站)' : ''}${role.isFarm ? ' (农田)' : ''}\nHP: ${role.currentHP}/${role.hp}\nATK: ${role.tempATK || role.atk}\n速度: ${role.speed}\n玩家: 玩家${role.player}`;
                 document.getElementById('piece-info-text').textContent = text;
                 document.getElementById('piece-info').classList.add('show');
             }
@@ -1664,7 +1899,7 @@
                     return;
                 }
                 
-                if (this.fortressPlaceMode) return;
+                if (this.fortressPlaceMode || this.wallMode || this.supplyPlaceMode || this.farmMode) return;
                 
                 if (this.selectedPiece && !this.hasMoved && this.selectedPiece.player === this.currentPlayer) {
                     const distance = this.getManhattanDistance(this.selectedPiece.posX, this.selectedPiece.posY, x, y);
@@ -1680,7 +1915,15 @@
                             document.getElementById('action-buttons').style.display = 'none';
                             this.renderBoard();
                             this.checkWin();
-                        } else if (cellData.piece.player !== this.currentPlayer) {
+                        } else if (cellData.piece.player !== this.currentPlayer && cellData.piece.alive) {
+                            if (cellData.piece.isWall && this.selectedPiece.name !== '工人') {
+                                alert('只能用工人在旁边拆除城墙！');
+                                return;
+                            }
+                            if (cellData.piece.isWall && distance !== 1) {
+                                alert('只能在城墙旁边拆除！');
+                                return;
+                            }
                             this.recordAction({ type: 'attack', pieceId: this.selectedPiece.id, fromX: this.selectedPiece.posX, fromY: this.selectedPiece.posY, toX: x, toY: y });
                             this.attackPiece(this.selectedPiece, cellData.piece, x, y);
                             this.hasMoved = true;
@@ -1716,6 +1959,14 @@
 
                 let atkDamage = attacker.tempATK || attacker.atk;
                 let defDamage = defender.tempATK || defender.atk;
+
+                // 刺客概率伤害
+                if (attacker.name === '刺客') {
+                    const multipliers = [0.5, 1, 2];
+                    const mult = multipliers[Math.floor(Math.random() * 3)];
+                    atkDamage *= mult;
+                    if (!this.isReplaying) alert(`刺客暴击倍率: ${mult}x`);
+                }
                 
                 if (defender.isFortress) {
                     defDamage = Math.floor(defDamage / 2);
@@ -1724,6 +1975,16 @@
                 defender.currentHP -= atkDamage;
                 attacker.currentHP -= defDamage;
                 
+                // 农田归属切换
+                if (defender.isFarm) {
+                    const originalPlayer = defender.player;
+                    const originalRoles = this.playerRoles[originalPlayer - 1];
+                    originalRoles.splice(originalRoles.indexOf(defender), 1);
+                    defender.player = attacker.player;
+                    this.playerRoles[attacker.player - 1].push(defender);
+                    if (!this.isReplaying) alert(`${defender.name} 归属玩家${attacker.player}！`);
+                }
+
                 let defenderDied = false;
                 if (defender.currentHP <= 0) {
                     defender.currentHP = 0;
@@ -1733,6 +1994,21 @@
                 if (attacker.currentHP <= 0) {
                     attacker.currentHP = 0;
                     attacker.alive = false;
+                }
+
+                // 谋士叛变逻辑
+                if (attacker.name === '谋士' && defender.player !== attacker.player) {
+                    if (!attacker.attackedTargets) attacker.attackedTargets = new Set();
+                    const wasFirstAttack = !attacker.attackedTargets.has(defender.id);
+                    attacker.attackedTargets.add(defender.id);
+                    if (!wasFirstAttack && defender.alive && !defenderDied) {
+                        // 叛变
+                        const originalPlayer = defender.player;
+                        this.playerRoles[originalPlayer - 1] = this.playerRoles[originalPlayer - 1].filter(r => r !== defender);
+                        defender.player = attacker.player;
+                        this.playerRoles[attacker.player - 1].push(defender);
+                        if (!this.isReplaying) alert(`${defender.name} 叛变加入玩家${attacker.player}一方！`);
+                    }
                 }
 
                 if (defenderDied && attacker.alive) {
@@ -1779,7 +2055,9 @@
                                 if (!cellData.piece) {
                                     cellData.element.classList.add('movable');
                                 } else if (cellData.piece.player !== this.currentPlayer && cellData.piece.alive) {
-                                    cellData.element.classList.add('attackable');
+                                    if (!cellData.piece.isWall || (this.selectedPiece.name === '工人' && distance === 1)) {
+                                        cellData.element.classList.add('attackable');
+                                    }
                                 }
                             }
                         }
@@ -1788,7 +2066,7 @@
             }
 
             movePiece(piece, tx, ty) {
-                if (piece.isFortress) return; // 堡垒不可移动
+                if (piece.isFortress || piece.isWall || piece.isSupply || piece.isFarm) return; // 堡垒、城墙、补给站、农田不可移动
                 const fromCell = this.getCell(piece.posX, piece.posY);
                 if (fromCell) fromCell.piece = null;
                 
@@ -1808,6 +2086,12 @@
                             piece.currentHP = Math.max(1, piece.currentHP - toCell.obstacle.amount);
                             if (!this.isReplaying) alert(`受到伤害 -${toCell.obstacle.amount} HP！`);
                         }
+                    }
+
+                    // 补给站满血
+                    if (toCell.piece && toCell.piece.isSupply && toCell.piece.player === piece.player) {
+                        piece.currentHP = piece.hp;
+                        if (!this.isReplaying) alert('补给站满血恢复！');
                     }
                 }
             }
@@ -1886,6 +2170,14 @@
                     const confirm = window.confirm('还没有移动棋子，确定要结束回合吗？');
                     if (!confirm) return;
                 }
+
+                // 农田生产财富
+                this.playerRoles[this.currentPlayer - 1].forEach(role => {
+                    if (role.isFarm && role.alive) {
+                        this.playerWealth[this.currentPlayer - 1] += 50;
+                    }
+                });
+                this.updateWealthDisplay();
                 
                 this.recordAction({ type: 'endTurn' });
                 
@@ -1898,11 +2190,17 @@
                 this.selectedGroup = [];
                 this.groupSelectMode = false;
                 this.fortressPlaceMode = false;
+                this.supplyPlaceMode = false;
+                this.farmMode = false;
+                this.wallMode = false;
                 this.selectedFortressType = null;
                 this.selectedFortressHP = null;
                 this.selectedFortressPrice = null;
                 document.getElementById('fortress-selector').classList.remove('show');
                 document.getElementById('fortress-hint').style.display = 'none';
+                document.getElementById('wall-hint').style.display = 'none';
+                document.getElementById('supply-hint').style.display = 'none';
+                document.getElementById('farm-hint').style.display = 'none';
                 this.hasMoved = false;
                 document.getElementById('action-buttons').style.display = 'none';
                 this.updateGroupUI();
@@ -1945,11 +2243,14 @@
 
             resetGame() {
                 this.playerRoles = [[], []];
-                this.playerWealth = [1000, 1000];
+                this.playerWealth = [1500, 1500];
                 this.selectedPiece = null;
                 this.selectedGroup = [];
                 this.groupSelectMode = false;
                 this.fortressPlaceMode = false;
+                this.supplyPlaceMode = false;
+                this.farmMode = false;
+                this.wallMode = false;
                 this.selectedFortressType = null;
                 this.selectedFortressHP = null;
                 this.selectedFortressPrice = null;
@@ -1973,6 +2274,9 @@
                 document.getElementById('action-buttons').style.display = 'none';
                 document.getElementById('fortress-selector').classList.remove('show');
                 document.getElementById('fortress-hint').style.display = 'none';
+                document.getElementById('wall-hint').style.display = 'none';
+                document.getElementById('supply-hint').style.display = 'none';
+                document.getElementById('farm-hint').style.display = 'none';
                 this.initBoard();
                 this.generateObstacles();
                 this.renderBoard();
